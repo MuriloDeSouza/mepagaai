@@ -1,9 +1,10 @@
 # 🤝 Me Paga Aí — Finspace
 
-Aplicativo de divisão de contas inteligente. Parte do TCC de Engenharia de Computação — Inteli 2025.
+Aplicativo de divisão de contas inteligente. Parte do TCC de Engenharia de Computação — Inteli 2026.
 
 **Autor:** Murilo Prianti  
 **Orientação:** Instituto de Tecnologia e Liderança — Inteli
+**Professor/a orientador/a**Laíza Ribeiro
 
 ---
 
