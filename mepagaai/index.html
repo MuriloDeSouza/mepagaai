@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Me Paga Aí — Divida contas, preserve amizades. Parte do ecossistema Finspace.">
+  <meta name="theme-color" content="#0D1B2A">
+  <title>Me Paga Aí · Finspace</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- PWA icon fallback via emoji favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤝</text></svg>">
+</head>
+<body>
+
+<!-- ── TOAST CONTAINER ──────────────────────────────────── -->
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+<!-- ── OVERLAYS ─────────────────────────────────────────── -->
+<div id="overlay-create-event" class="overlay hidden" role="dialog"></div>
+<div id="overlay-add-expense"  class="overlay hidden" role="dialog"></div>
+<div id="overlay-pix"  class="overlay center hidden" role="dialog"></div>
+<div id="overlay-join" class="overlay center hidden" role="dialog"></div>
+
+<!-- ════════════════════════════════════════════════════════
+     PAGE: LANDING
+════════════════════════════════════════════════════════ -->
+<div id="page-landing" class="page">
+  <div class="landing-hero">
+    <div class="landing-logo">🤝</div>
+    <h1 class="landing-title text-white">Me Paga Aí</h1>
+    <div class="landing-subtitle">Divida contas. Preserve amizades.</div>
+
+    <!-- demo cards -->
+    <div class="landing-cards">
+      <div class="demo-card">
+        <div class="dc-name">João</div>
+        <div class="dc-value text-teal">+R$ 75</div>
+        <small>a receber</small>
+      </div>
+      <div class="demo-card">
+        <div class="dc-name">Beatriz</div>
+        <div class="dc-value text-red">-R$ 47</div>
+        <small>deve</small>
+      </div>
+      <div class="demo-card">
+        <div class="dc-name">Carlos</div>
+        <div class="dc-value text-teal">Quite ✓</div>
+        <small>&nbsp;</small>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px">
+      <button class="btn btn-primary btn-lg btn-block" onclick="Router.go('/onboarding')">
+        Criar minha conta
+      </button>
+      <button class="btn btn-outline btn-lg btn-block" onclick="openJoinModal()">
+        🔑 Entrar com código
+      </button>
+    </div>
+
+    <p style="margin-top:32px;font-size:.78rem;color:var(--text-light)">
+      Me Paga Aí · Finspace · Inteli 2025
+    </p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     PAGE: ONBOARDING
+════════════════════════════════════════════════════════ -->
+<div id="page-onboarding" class="page">
+  <div class="onboarding-wrap" id="onboarding-inner">
+    <!-- top bar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:1rem">🤝 Me Paga Aí</div>
+      <button style="background:none;border:none;color:var(--text-light);font-size:.82rem;cursor:pointer" onclick="Router.go('/')">Sair</button>
+    </div>
+
+    <!-- stepper -->
+    <div class="stepper" id="ob-stepper"></div>
+
+    <!-- Step 1 -->
+    <div class="onboarding-step" id="ob-s1">
+      <h2 style="margin-bottom:4px">Quem é você?</h2>
+      <p style="margin-bottom:24px">Crie seu perfil para dividir contas.</p>
+
+      <div class="photo-upload-circle" id="ob-photo-area">📷
+        <input type="file" id="ob-photo-input" accept="image/*" style="display:none">
+      </div>
+      <p style="text-align:center;font-size:.78rem;color:var(--text-light);margin-bottom:20px">Foto de perfil (opcional)</p>
+
+      <div class="flex flex-col gap-4">
+        <div class="form-group">
+          <label class="form-label">Nome completo *</label>
+          <input id="ob-name" class="input" placeholder="Seu nome" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-mail *</label>
+          <input id="ob-email" class="input" type="email" placeholder="seu@email.com" autocomplete="email">
+        </div>
+        <button id="ob-next1" class="btn btn-primary btn-block btn-lg" style="margin-top:8px">Próximo →</button>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="onboarding-step" id="ob-s2">
+      <h2 style="margin-bottom:4px">Suas chaves PIX</h2>
+      <p style="margin-bottom:20px">Usadas para gerar cobranças automáticas.</p>
+
+      <div class="flex flex-col gap-3">
+        <div style="display:flex;gap:8px">
+          <select id="ob-pix-type" class="input select" style="flex:1">
+            <option value="email">E-mail</option>
+            <option value="cpf">CPF</option>
+            <option value="telefone">Telefone</option>
+            <option value="aleatória">Chave aleatória</option>
+          </select>
+          <input id="ob-pix-value" class="input" placeholder="Valor da chave" style="flex:2">
+        </div>
+        <button id="ob-add-pix" class="btn btn-outline btn-sm">+ Adicionar chave</button>
+        <div id="ob-pix-list"></div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:20px">
+        <button id="ob-back2" class="btn btn-ghost" style="flex:1">← Voltar</button>
+        <button id="ob-next2" class="btn btn-primary" style="flex:2">Próximo →</button>
+      </div>
+      <button id="ob-skip2" class="btn btn-ghost btn-block" style="margin-top:8px;font-size:.82rem">Pular por agora →</button>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="onboarding-step" id="ob-s3">
+      <div id="ob-s3-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     PAGE: HOME
+════════════════════════════════════════════════════════ -->
+<div id="page-home" class="page">
+  <div class="page-header">
+    <div>
+      <div style="font-size:1.1rem;font-weight:700" id="home-greeting">Olá!</div>
+      <div style="font-size:.78rem;color:var(--text-light)" id="home-subtitle"></div>
+    </div>
+    <button id="home-avatar" style="background:none;border:none;cursor:pointer" onclick="Router.go('/perfil')"></button>
+  </div>
+
+  <div class="page-content">
+    <!-- stat cards -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
+      <div class="card stat-card">
+        <div style="font-size:.68rem;color:var(--teal);margin-bottom:4px">A RECEBER</div>
+        <div class="stat-value text-teal" id="home-receive">R$ 0</div>
+      </div>
+      <div class="card stat-card">
+        <div style="font-size:.68rem;color:var(--red);margin-bottom:4px">A PAGAR</div>
+        <div class="stat-value text-red" id="home-pay">R$ 0</div>
+      </div>
+      <div class="card stat-card">
+        <div style="font-size:.68rem;color:var(--text-light);margin-bottom:4px">LÍQUIDO</div>
+        <div class="stat-value" id="home-net">R$ 0</div>
+      </div>
+    </div>
+
+    <!-- urgent -->
+    <div id="home-urgent"></div>
+
+    <!-- recent events -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h3>Eventos recentes</h3>
+      <button class="btn btn-ghost btn-sm" onclick="Router.go('/eventos')">Ver todos →</button>
+    </div>
+    <div id="home-events" class="flex flex-col gap-3"></div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" onclick="CreateEventModal.open()">+</button>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     PAGE: EVENTOS (list)
+════════════════════════════════════════════════════════ -->
+<div id="page-eventos" class="page">
+  <div class="page-header">
+    <div>
+      <h2>Eventos</h2>
+      <div style="font-size:.78rem;color:var(--text-light)">Divida sem perder o controle</div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="openJoinModal(()=>renderEventos())">🔑 Código</button>
+  </div>
+
+  <div class="page-content">
+    <!-- filters -->
+    <div class="filter-scroll" id="eventos-filters">
+      <div class="filter-chip active" data-filter="all">Todos</div>
+      <div class="filter-chip" data-filter="open">Abertos</div>
+      <div class="filter-chip" data-filter="closed">Encerrados</div>
+      <div class="filter-chip" data-filter="host">Anfitrião</div>
+      <div class="filter-chip" data-filter="guest">Convidado</div>
+    </div>
+    <div id="eventos-list" class="flex flex-col gap-3"></div>
+  </div>
+
+  <button class="fab" onclick="CreateEventModal.open()">+</button>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     PAGE: EVENTO INTERNO
+════════════════════════════════════════════════════════ -->
+<div id="page-evento" class="page">
+  <div class="page-header">
+    <button class="back-btn" onclick="Router.go('/eventos')">← Voltar</button>
+    <div style="text-align:center;flex:1">
+      <div id="ev-title" style="font-weight:700;font-size:.95rem"></div>
+      <div id="ev-status-badge" style="margin-top:2px"></div>
+    </div>
+    <button id="ev-close-btn" class="btn btn-danger btn-sm" style="display:none">Encerrar</button>
+  </div>
+
+  <!-- sub-header metrics -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 20px;border-bottom:1px solid var(--border-dark)">
+    <div>
+      <div style="font-size:.7rem;color:var(--text-light)">TOTAL DO EVENTO</div>
+      <div id="ev-total" style="font-weight:700;font-size:1.1rem"></div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:.7rem;color:var(--text-light)">MEU SALDO</div>
+      <div id="ev-mybal" style="font-weight:700;font-size:1.1rem"></div>
+    </div>
+  </div>
+  <div style="padding:8px 20px;border-bottom:1px solid var(--border-dark)">
+    <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-light);margin-bottom:4px">
+      <span>Participantes quites</span>
+      <span id="ev-progress-label"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="ev-progress-fill" style="width:0%"></div></div>
+  </div>
+
+  <!-- nudge banner -->
+  <div style="padding:0 20px;margin-top:10px">
+    <div class="nudge-banner hidden" id="nudge-banner">
+      <span style="font-size:1.2rem">⚠️</span>
+      <div class="nudge-text flex-1"></div>
+      <button class="nudge-close" onclick="document.getElementById('nudge-banner').classList.add('hidden')">✕</button>
+    </div>
+  </div>
+
+  <!-- tabs -->
+  <div style="padding:0 20px">
+    <div class="tabs-bar">
+      <button class="tab-btn ev-tab" data-tab="despesas">🧾 Despesas</button>
+      <button class="tab-btn ev-tab" data-tab="saldos">⚖️ Saldos</button>
+      <button class="tab-btn ev-tab" data-tab="pessoas">👥 Pessoas</button>
+    </div>
+  </div>
+
+  <div style="padding:0 20px 80px">
+    <!-- Despesas pane -->
+    <div class="ev-tab-pane" data-pane="despesas">
+      <div id="ev-expenses-list"></div>
+    </div>
+
+    <!-- Saldos pane -->
+    <div class="ev-tab-pane" data-pane="saldos">
+      <div id="ev-mybal-card" class="card" style="margin-bottom:16px;border-radius:14px;padding:16px"></div>
+
+      <h4 style="margin-bottom:10px">Resumo dos participantes</h4>
+      <div id="ev-balances-list" style="margin-bottom:20px"></div>
+
+      <h4 style="margin-bottom:10px">Quem paga quem</h4>
+      <div id="ev-settlements"></div>
+    </div>
+
+    <!-- Pessoas pane -->
+    <div class="ev-tab-pane" data-pane="pessoas">
+      <div id="ev-participants-list" style="margin-bottom:20px"></div>
+
+      <!-- invite code -->
+      <div class="code-box" style="margin-top:12px">
+        <div style="font-size:.75rem;color:var(--text-light);margin-bottom:4px">CÓDIGO DE CONVITE</div>
+        <div class="code-display" id="ev-invite-code"></div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" id="ev-copy-code">📋 Copiar</button>
+          <a class="btn btn-ghost btn-sm" id="ev-wa-code" href="#" target="_blank">📱 WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" id="fab-add-expense">+</button>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     PAGE: PERFIL
+════════════════════════════════════════════════════════ -->
+<div id="page-perfil" class="page">
+  <div class="page-header">
+    <h2>Perfil</h2>
+    <button class="btn btn-ghost btn-sm" onclick="if(confirm('Sair da conta?')){State.logout();Router.go('/')}">Sair</button>
+  </div>
+
+  <div class="page-content">
+    <div style="text-align:center;margin-bottom:24px">
+      <div id="perfil-avatar" style="margin:0 auto 12px;width:88px;height:88px"></div>
+      <h3 id="perfil-name"></h3>
+      <div id="perfil-email" style="font-size:.85rem;color:var(--text-light)"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h4 style="margin-bottom:12px">🔑 Minhas chaves PIX</h4>
+      <div id="perfil-pix-list"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h4 style="margin-bottom:12px">📊 Meus eventos</h4>
+      <div id="perfil-events"></div>
+    </div>
+
+    <div class="card">
+      <h4 style="margin-bottom:8px">ℹ️ Sobre o app</h4>
+      <p style="font-size:.82rem;color:var(--text-light)">Me Paga Aí v1.0 · Finspace</p>
+      <p style="font-size:.78rem;color:var(--text-light);margin-top:4px">TCC de Engenharia de Computação · Inteli 2025</p>
+      <p style="font-size:.78rem;color:var(--text-light);margin-top:4px">Autor: Murilo Prianti</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── BOTTOM NAV ─────────────────────────────────────────── -->
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="nav-tab" data-page="home" onclick="Router.go('/home')">
+    <span class="nav-icon">🏠</span>Home
+  </button>
+  <button class="nav-tab" data-page="eventos" onclick="Router.go('/eventos')">
+    <span class="nav-icon">🤝</span>Eventos
+  </button>
+  <button class="nav-tab" data-page="perfil" onclick="Router.go('/perfil')">
+    <span class="nav-icon">👤</span>Perfil
+  </button>
+</nav>
+
+<!-- ── SCRIPTS ────────────────────────────────────────────── -->
+<script src="js/state.js"></script>
+<script src="js/router.js"></script>
+<script src="js/modals.js"></script>
+<script src="js/pages.js"></script>
+<script>
+'use strict';
+
+// Fix tab rendering: remap data-tab to pane IDs
+document.querySelectorAll('.ev-tab').forEach(t => {
+  if (t.dataset.tab === 'pessoas') t.dataset.tab = 'pessoas';
+});
+document.querySelectorAll('.ev-tab-pane').forEach(p => {
+  if (p.dataset.pane === 'pessoas') {}
+});
+// re-alias tab 'pessoas' → 'pessoas' (already correct above)
+
+// ── INIT ─────────────────────────────────────────────────────
+function boot() {
+  const restored = State.restore();
+
+  // Handle pending code from sessionStorage (arrived from landing without login)
+  // already handled in OnboardingPage
+
+  Router.on('/', () => {
+    if (restored) Router.go('/home');
+    else { Pages.show('landing'); document.getElementById('bottom-nav').style.display = 'none'; }
+  });
+
+  Router.on('/onboarding', () => {
+    Pages.show('onboarding');
+    document.getElementById('bottom-nav').style.display = 'none';
+    OnboardingPage.render();
+  });
+
+  Router.on('/home', () => {
+    if (!State.user) { Router.go('/'); return; }
+    renderHome();
+  });
+
+  Router.on('/eventos', () => {
+    if (!State.user) { Router.go('/'); return; }
+    renderEventos();
+  });
+
+  Router.on('/evento', (id) => {
+    if (!State.user) { Router.go('/'); return; }
+    // hide bottom-nav on event detail
+    document.getElementById('bottom-nav').style.display = 'none';
+    EventPage.render(id);
+  });
+
+  Router.on('/perfil', () => {
+    if (!State.user) { Router.go('/'); return; }
+    renderPerfil();
+  });
+
+  // restore bottom nav when leaving event detail
+  window.addEventListener('hashchange', () => {
+    const hash = window.location.hash.slice(1) || '/';
+    const noNav = ['/', '/onboarding'];
+    const isEventDetail = hash.startsWith('/evento/');
+    if (noNav.some(r => hash === r) || isEventDetail) {
+      document.getElementById('bottom-nav').style.display = 'none';
+    }
+  });
+
+  Router.start();
+
+  // ONBOARDING: fix tab references for evento page
+  // 'pessoas' tab pane needs to be matched correctly
+  document.querySelectorAll('.ev-tab').forEach(btn => {
+    const map = { 'despesas':'despesas','saldos':'saldos','pessoas':'pessoas' };
+    const orig = btn.dataset.tab;
+    btn.onclick = () => {
+      const tab = orig;
+      document.querySelectorAll('.ev-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      document.querySelectorAll('.ev-tab-pane').forEach(p => p.classList.toggle('active', p.dataset.pane === tab));
+      const evId = State.currentEventId;
+      if (tab === 'despesas') EventPage.renderExpenses();
+      else if (tab === 'saldos') EventPage.renderSaldos();
+    };
+  });
+}
+
+document.addEventListener('DOMContentLoaded', boot);
+</script>
+</body>
+</html>
