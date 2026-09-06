@@ -8,15 +8,26 @@
 // ── FIREBASE CONFIG ────────────────────────────────────────────────────────
 // ⚠️  MURILO: substitua pelos seus dados do Firebase Console
 //    (Instruções no README — é gratuito e leva 3 minutos)
-const FIREBASE_CONFIG = {
-  apiKey:            "AIzaSyDEMO_SUBSTITUA_PELA_SUA_KEY",
-  authDomain:        "mepagaai-demo.firebaseapp.com",
-  databaseURL:       "https://mepagaai-demo-default-rtdb.firebaseio.com",
-  projectId:         "mepagaai-demo",
-  storageBucket:     "mepagaai-demo.appspot.com",
-  messagingSenderId: "000000000000",
-  appId:             "1:000000000000:web:demo0000000000000000"
+const firebaseConfig = {
+
+  apiKey: "AIzaSyBR1PF55u_2262nVJ10_zMrx2IDBL7YIkc",
+
+  authDomain: "mepagaai-v.firebaseapp.com",
+
+  databaseURL: "https://mepagaai-v-default-rtdb.firebaseio.com",
+
+  projectId: "mepagaai-v",
+
+  storageBucket: "mepagaai-v.firebasestorage.app",
+
+  messagingSenderId: "80888089391",
+
+  appId: "1:80888089391:web:f0ccb073c1f0d7bcd4efda",
+
+  measurementId: "G-V0BFFN2Z0F"
+
 };
+
 
 // ── FIREBASE INIT ──────────────────────────────────────────────────────────
 let DB = null;          // Firebase DB reference
