@@ -1,431 +1,1466 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-bs-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="description" content="Me Paga Aí — Divida contas, preserve amizades. Parte do ecossistema Finspace.">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="description" content="Me Paga Aí — Divida contas, preserve amizades.">
   <meta name="theme-color" content="#0D1B2A">
-  <title>Me Paga Aí · Finspace</title>
-  <link rel="stylesheet" href="css/style.css">
-  <!-- PWA icon fallback via emoji favicon -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤝</text></svg>">
+  <title>Me Paga Aí</title>
+
+  <!-- Bootstrap 5.3 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Firebase 9 compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <style>
+    :root {
+      --bg:        #0D1B2A;
+      --card-bg:   #152234;
+      --card-alt:  #1A2E45;
+      --teal:      #1D9E75;
+      --teal-dk:   #128059;
+      --teal-glow: rgba(29,158,117,.15);
+      --amber:     #F59E0B;
+      --red:       #EF4444;
+      --border:    #1E3A5F;
+      --muted:     #6B7280;
+      --nav-h:     56px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: #e2e8f0;
+      min-height: 100vh;
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── APP WRAPPER ─────────── */
+    #app-root { max-width: 480px; margin: 0 auto; position: relative; min-height: 100vh; }
+
+    /* ── SCREENS ─────────────── */
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: block; }
+
+    /* ── NAV ─────────────────── */
+    #bottom-nav {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 480px;
+      height: var(--nav-h); background: var(--card-bg);
+      border-top: 1px solid var(--border);
+      display: none; z-index: 1000;
+    }
+    #bottom-nav.show { display: flex; }
+    .nav-btn {
+      flex: 1; background: none; border: none; color: var(--muted);
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 2px; font-size: .65rem; font-weight: 600;
+      padding: 6px; cursor: pointer; transition: color .15s;
+    }
+    .nav-btn i { font-size: 1.25rem; }
+    .nav-btn.active { color: var(--teal); }
+
+    /* ── TOP BAR ─────────────── */
+    .topbar {
+      position: sticky; top: 0; z-index: 900;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .topbar-title { font-weight: 700; font-size: 1rem; flex: 1; }
+
+    /* ── CARDS ───────────────── */
+    .mpa-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 16px;
+      transition: border-color .15s, transform .15s;
+    }
+    .mpa-card.clickable { cursor: pointer; }
+    .mpa-card.clickable:hover { border-color: var(--teal); transform: translateY(-1px); }
+
+    /* ── INPUTS ──────────────── */
+    .form-control, .form-select {
+      background: var(--card-alt) !important;
+      border: 1.5px solid var(--border) !important;
+      color: #e2e8f0 !important;
+      border-radius: 10px !important;
+    }
+    .form-control::placeholder { color: var(--muted) !important; }
+    .form-control:focus, .form-select:focus {
+      border-color: var(--teal) !important;
+      box-shadow: 0 0 0 3px var(--teal-glow) !important;
+    }
+    .form-label { font-size: .82rem; font-weight: 600; color: #94a3b8; }
+
+    /* ── BUTTONS ─────────────── */
+    .btn-teal { background: var(--teal); color: #fff; border: none; border-radius: 10px; font-weight: 600; }
+    .btn-teal:hover, .btn-teal:focus { background: var(--teal-dk); color: #fff; }
+    .btn-outline-teal { background: transparent; border: 1.5px solid var(--teal); color: var(--teal); border-radius: 10px; font-weight: 600; }
+    .btn-outline-teal:hover { background: var(--teal-glow); }
+    .btn-ghost { background: var(--card-alt); color: #e2e8f0; border: 1px solid var(--border); border-radius: 10px; font-weight: 500; }
+    .btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+
+    /* ── BADGES ──────────────── */
+    .badge-teal   { background: rgba(29,158,117,.2); color: var(--teal); }
+    .badge-red    { background: rgba(239,68,68,.2);  color: var(--red);  }
+    .badge-amber  { background: rgba(245,158,11,.2); color: var(--amber);}
+    .badge-gray   { background: rgba(107,114,128,.2);color: #94a3b8; }
+
+    /* ── CODE BOX ────────────── */
+    .code-display {
+      font-size: 2rem; font-weight: 800; letter-spacing: 6px;
+      color: var(--teal); background: var(--card-alt);
+      border: 2px solid var(--teal); border-radius: 12px;
+      padding: 16px; text-align: center;
+    }
+
+    /* ── FAB ─────────────────── */
+    .fab {
+      position: fixed; bottom: calc(var(--nav-h) + 14px); right: 16px;
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--teal); color: #fff; border: none; font-size: 1.5rem;
+      box-shadow: 0 4px 20px rgba(29,158,117,.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 950; cursor: pointer; transition: transform .15s, background .15s;
+    }
+    .fab:hover { background: var(--teal-dk); transform: scale(1.06); }
+    .fab.hidden { display: none !important; }
+
+    /* ── STEPPER ─────────────── */
+    .stepper { display: flex; align-items: center; gap: 0; }
+    .step-node {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .72rem; font-weight: 700; transition: all .2s;
+    }
+    .step-node.done   { background: var(--teal-dk); color: #fff; }
+    .step-node.active { background: var(--teal); color: #fff; }
+    .step-node.pending{ background: var(--card-alt); color: var(--muted); border:1px solid var(--border); }
+    .step-line { flex: 1; height: 2px; background: var(--border); }
+    .step-line.done { background: var(--teal); }
+
+    /* ── TABS ────────────────── */
+    .mpa-tabs { display: flex; border-bottom: 1.5px solid var(--border); }
+    .mpa-tab {
+      flex: 1; background: none; border: none; padding: 11px 4px;
+      color: var(--muted); font-size: .83rem; font-weight: 600;
+      border-bottom: 2.5px solid transparent; margin-bottom: -1.5px;
+      cursor: pointer; transition: all .15s;
+    }
+    .mpa-tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── PROGRESS ────────────── */
+    .prog-bar { background: var(--border); border-radius: 8px; height: 6px; overflow: hidden; }
+    .prog-fill { height: 100%; background: var(--teal); border-radius: 8px; transition: width .4s; }
+
+    /* ── UPLOAD ──────────────── */
+    .upload-zone {
+      border: 2px dashed var(--border); border-radius: 12px;
+      padding: 20px; text-align: center; cursor: pointer;
+      color: var(--muted); transition: all .2s; font-size: .85rem;
+    }
+    .upload-zone:hover, .upload-zone.has-img { border-color: var(--teal); color: var(--teal); }
+
+    /* ── FILTER CHIPS ────────── */
+    .chip-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+    .chip-scroll::-webkit-scrollbar { display: none; }
+    .filter-chip {
+      flex-shrink: 0; padding: 5px 14px; border-radius: 20px;
+      background: var(--card-bg); border: 1.5px solid var(--border);
+      color: var(--muted); font-size: .8rem; font-weight: 600;
+      cursor: pointer; transition: all .15s; white-space: nowrap;
+    }
+    .filter-chip.active { background: var(--teal-glow); border-color: var(--teal); color: var(--teal); }
+
+    /* ── SETTLEMENT ITEM ─────── */
+    .settle-row {
+      background: var(--card-alt); border-radius: 12px; padding: 12px 14px;
+      display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+    }
+
+    /* ── NUDGE BANNER ────────── */
+    .nudge-bar {
+      background: rgba(245,158,11,.12); border: 1px solid var(--amber);
+      border-radius: 12px; padding: 12px 14px; display: flex;
+      gap: 10px; align-items: flex-start; font-size: .82rem; color: var(--amber);
+    }
+
+    /* ── LANDING ─────────────── */
+    #screen-landing {
+      background: radial-gradient(ellipse at top, #1a3a5c 0%, var(--bg) 60%);
+    }
+
+    /* ── TRANSITIONS ─────────── */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+    .screen.active > * { animation: fadeIn .22s ease-out; }
+
+    /* ── MISC ────────────────── */
+    .page-content { padding: 14px 14px calc(var(--nav-h) + 20px); }
+    .event-emoji { width: 44px; height: 44px; background: var(--card-alt); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+    .pix-key-row { background: var(--card-alt); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  </style>
 </head>
 <body>
+<div id="app-root">
 
-<!-- ── TOAST CONTAINER ──────────────────────────────────── -->
-<div id="toast-container" class="toast-container" aria-live="polite"></div>
-
-<!-- ── OVERLAYS ─────────────────────────────────────────── -->
-<div id="overlay-create-event" class="overlay hidden" role="dialog"></div>
-<div id="overlay-add-expense"  class="overlay hidden" role="dialog"></div>
-<div id="overlay-pix"  class="overlay center hidden" role="dialog"></div>
-<div id="overlay-join" class="overlay center hidden" role="dialog"></div>
-
-<!-- ════════════════════════════════════════════════════════
-     PAGE: LANDING
-════════════════════════════════════════════════════════ -->
-<div id="page-landing" class="page">
-  <div class="landing-hero">
-    <div class="landing-logo">🤝</div>
-    <h1 class="landing-title text-white">Me Paga Aí</h1>
-    <div class="landing-subtitle">Divida contas. Preserve amizades.</div>
+<!-- ════════ SCREEN: LANDING ════════ -->
+<div id="screen-landing" class="screen">
+  <div class="d-flex flex-column align-items-center justify-content-center text-center px-4" style="min-height:100vh;max-width:400px;margin:0 auto">
+    <div style="font-size:3.5rem;margin-bottom:12px">🤝</div>
+    <h1 class="fw-800 mb-1" style="font-size:2.4rem;font-weight:800">Me Paga Aí</h1>
+    <p class="mb-4" style="color:var(--teal);font-size:1.05rem;font-weight:600">Divida contas. Preserve amizades.</p>
 
     <!-- demo cards -->
-    <div class="landing-cards">
-      <div class="demo-card">
-        <div class="dc-name">João</div>
-        <div class="dc-value text-teal">+R$ 75</div>
-        <small>a receber</small>
+    <div class="d-flex gap-2 mb-4 flex-wrap justify-content-center">
+      <div class="mpa-card text-start" style="min-width:120px">
+        <div class="small text-muted mb-1">João</div>
+        <div class="fw-700" style="color:var(--teal)">+R$ 75,00</div>
+        <div style="font-size:.7rem;color:var(--muted)">a receber</div>
       </div>
-      <div class="demo-card">
-        <div class="dc-name">Beatriz</div>
-        <div class="dc-value text-red">-R$ 47</div>
-        <small>deve</small>
+      <div class="mpa-card text-start" style="min-width:120px">
+        <div class="small text-muted mb-1">Beatriz</div>
+        <div class="fw-700" style="color:var(--red)">-R$ 47,50</div>
+        <div style="font-size:.7rem;color:var(--muted)">deve</div>
       </div>
-      <div class="demo-card">
-        <div class="dc-name">Carlos</div>
-        <div class="dc-value text-teal">Quite ✓</div>
-        <small>&nbsp;</small>
+      <div class="mpa-card text-start" style="min-width:120px">
+        <div class="small text-muted mb-1">Carlos</div>
+        <div class="fw-700" style="color:var(--teal)">Quite ✓</div>
+        <div style="font-size:.7rem;color:var(--muted)">&nbsp;</div>
       </div>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px">
-      <button class="btn btn-primary btn-lg btn-block" onclick="Router.go('/onboarding')">
-        Criar minha conta
+    <div class="d-grid gap-2 w-100" style="max-width:320px">
+      <button class="btn btn-teal btn-lg" onclick="UI.go('onboarding')">
+        <i class="bi bi-person-plus me-2"></i>Criar minha conta
       </button>
-      <button class="btn btn-outline btn-lg btn-block" onclick="openJoinModal()">
-        🔑 Entrar com código
+      <button class="btn btn-outline-teal btn-lg" onclick="UI.openJoinModal()">
+        <i class="bi bi-key me-2"></i>Entrar com código de evento
       </button>
     </div>
 
-    <p style="margin-top:32px;font-size:.78rem;color:var(--text-light)">
-      Me Paga Aí · Finspace · Inteli 2025
-    </p>
+    <p class="mt-4" style="font-size:.72rem;color:var(--muted)">Me Paga Aí · Finspace · Inteli 2025<br>TCC — Murilo Prianti</p>
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════
-     PAGE: ONBOARDING
-════════════════════════════════════════════════════════ -->
-<div id="page-onboarding" class="page">
-  <div class="onboarding-wrap" id="onboarding-inner">
-    <!-- top bar -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:1rem">🤝 Me Paga Aí</div>
-      <button style="background:none;border:none;color:var(--text-light);font-size:.82rem;cursor:pointer" onclick="Router.go('/')">Sair</button>
+<!-- ════════ SCREEN: ONBOARDING ════════ -->
+<div id="screen-onboarding" class="screen">
+  <div style="max-width:440px;margin:0 auto;padding:24px 16px 40px">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <span class="fw-700" style="font-size:1rem">🤝 Me Paga Aí</span>
+      <button class="btn btn-ghost btn-sm" onclick="UI.go('landing')">Cancelar</button>
     </div>
 
     <!-- stepper -->
-    <div class="stepper" id="ob-stepper"></div>
+    <div class="stepper mb-4" id="ob-stepper"></div>
 
     <!-- Step 1 -->
-    <div class="onboarding-step" id="ob-s1">
-      <h2 style="margin-bottom:4px">Quem é você?</h2>
-      <p style="margin-bottom:24px">Crie seu perfil para dividir contas.</p>
+    <div id="ob-s1" class="ob-step">
+      <h4 class="fw-700 mb-1">Quem é você?</h4>
+      <p class="text-muted small mb-4">Crie seu perfil para dividir contas com amigos.</p>
 
-      <div class="photo-upload-circle" id="ob-photo-area">📷
-        <input type="file" id="ob-photo-input" accept="image/*" style="display:none">
+      <div class="text-center mb-3">
+        <div id="ob-photo-circle" onclick="document.getElementById('ob-photo-inp').click()"
+          style="width:80px;height:80px;border-radius:50%;border:2px dashed var(--teal);display:flex;align-items:center;justify-content:center;cursor:pointer;margin:0 auto;font-size:1.8rem;color:var(--teal);overflow:hidden;background:var(--card-alt)">
+          <i class="bi bi-camera"></i>
+        </div>
+        <div class="small text-muted mt-1">Foto (opcional)</div>
+        <input type="file" id="ob-photo-inp" accept="image/*" style="display:none">
       </div>
-      <p style="text-align:center;font-size:.78rem;color:var(--text-light);margin-bottom:20px">Foto de perfil (opcional)</p>
 
-      <div class="flex flex-col gap-4">
-        <div class="form-group">
-          <label class="form-label">Nome completo *</label>
-          <input id="ob-name" class="input" placeholder="Seu nome" autocomplete="name">
-        </div>
-        <div class="form-group">
-          <label class="form-label">E-mail *</label>
-          <input id="ob-email" class="input" type="email" placeholder="seu@email.com" autocomplete="email">
-        </div>
-        <button id="ob-next1" class="btn btn-primary btn-block btn-lg" style="margin-top:8px">Próximo →</button>
+      <div class="mb-3">
+        <label class="form-label">Nome completo *</label>
+        <input id="ob-name" class="form-control" placeholder="Seu nome completo" autocomplete="name">
       </div>
+      <div class="mb-4">
+        <label class="form-label">E-mail *</label>
+        <input id="ob-email" class="form-control" type="email" placeholder="seu@email.com" autocomplete="email">
+      </div>
+      <button class="btn btn-teal w-100 py-3" onclick="Onboarding.next1()">Próximo <i class="bi bi-arrow-right"></i></button>
     </div>
 
     <!-- Step 2 -->
-    <div class="onboarding-step" id="ob-s2">
-      <h2 style="margin-bottom:4px">Suas chaves PIX</h2>
-      <p style="margin-bottom:20px">Usadas para gerar cobranças automáticas.</p>
+    <div id="ob-s2" class="ob-step d-none">
+      <h4 class="fw-700 mb-1">Suas chaves PIX</h4>
+      <p class="text-muted small mb-3">Usadas para cobranças automáticas quando você for anfitrião.</p>
 
-      <div class="flex flex-col gap-3">
-        <div style="display:flex;gap:8px">
-          <select id="ob-pix-type" class="input select" style="flex:1">
-            <option value="email">E-mail</option>
-            <option value="cpf">CPF</option>
-            <option value="telefone">Telefone</option>
-            <option value="aleatória">Chave aleatória</option>
-          </select>
-          <input id="ob-pix-value" class="input" placeholder="Valor da chave" style="flex:2">
-        </div>
-        <button id="ob-add-pix" class="btn btn-outline btn-sm">+ Adicionar chave</button>
-        <div id="ob-pix-list"></div>
+      <div class="d-flex gap-2 mb-2">
+        <select id="ob-pix-type" class="form-select" style="flex:.9">
+          <option value="email">E-mail</option>
+          <option value="cpf">CPF</option>
+          <option value="telefone">Telefone</option>
+          <option value="aleatoria">Chave aleatória</option>
+        </select>
+        <input id="ob-pix-val" class="form-control" placeholder="Valor da chave" style="flex:1.2">
       </div>
+      <button class="btn btn-outline-teal btn-sm w-100 mb-3" onclick="Onboarding.addPix()">
+        <i class="bi bi-plus-circle me-1"></i>Adicionar chave PIX
+      </button>
+      <div id="ob-pix-list" class="mb-4"></div>
 
-      <div style="display:flex;gap:8px;margin-top:20px">
-        <button id="ob-back2" class="btn btn-ghost" style="flex:1">← Voltar</button>
-        <button id="ob-next2" class="btn btn-primary" style="flex:2">Próximo →</button>
+      <div class="d-flex gap-2">
+        <button class="btn btn-ghost flex-1" onclick="Onboarding.setStep(1)"><i class="bi bi-arrow-left"></i> Voltar</button>
+        <button class="btn btn-teal flex-fill" onclick="Onboarding.next2()">Próximo <i class="bi bi-arrow-right"></i></button>
       </div>
-      <button id="ob-skip2" class="btn btn-ghost btn-block" style="margin-top:8px;font-size:.82rem">Pular por agora →</button>
+      <button class="btn btn-ghost btn-sm w-100 mt-2 text-muted" onclick="Onboarding.next2()">Pular por agora →</button>
     </div>
 
     <!-- Step 3 -->
-    <div class="onboarding-step" id="ob-s3">
-      <div id="ob-s3-content"></div>
+    <div id="ob-s3" class="ob-step d-none">
+      <div class="text-center py-3" id="ob-s3-content"></div>
     </div>
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════
-     PAGE: HOME
-════════════════════════════════════════════════════════ -->
-<div id="page-home" class="page">
-  <div class="page-header">
+<!-- ════════ SCREEN: HOME ════════ -->
+<div id="screen-home" class="screen">
+  <div class="topbar">
     <div>
-      <div style="font-size:1.1rem;font-weight:700" id="home-greeting">Olá!</div>
-      <div style="font-size:.78rem;color:var(--text-light)" id="home-subtitle"></div>
+      <div class="fw-700" id="home-greeting">Olá!</div>
+      <div class="small text-muted" id="home-subtitle"></div>
     </div>
-    <button id="home-avatar" style="background:none;border:none;cursor:pointer" onclick="Router.go('/perfil')"></button>
+    <button onclick="UI.go('perfil')" style="background:none;border:none;cursor:pointer" id="home-av"></button>
   </div>
 
   <div class="page-content">
-    <!-- stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
-      <div class="card stat-card">
-        <div style="font-size:.68rem;color:var(--teal);margin-bottom:4px">A RECEBER</div>
-        <div class="stat-value text-teal" id="home-receive">R$ 0</div>
+    <!-- stat row -->
+    <div class="row g-2 mb-3">
+      <div class="col-4">
+        <div class="mpa-card text-center">
+          <div style="font-size:.65rem;color:var(--teal);font-weight:700;letter-spacing:.5px">A RECEBER</div>
+          <div class="fw-800 mt-1" style="color:var(--teal);font-size:1.05rem" id="h-receive">-</div>
+        </div>
       </div>
-      <div class="card stat-card">
-        <div style="font-size:.68rem;color:var(--red);margin-bottom:4px">A PAGAR</div>
-        <div class="stat-value text-red" id="home-pay">R$ 0</div>
+      <div class="col-4">
+        <div class="mpa-card text-center">
+          <div style="font-size:.65rem;color:var(--red);font-weight:700;letter-spacing:.5px">A PAGAR</div>
+          <div class="fw-800 mt-1" style="color:var(--red);font-size:1.05rem" id="h-pay">-</div>
+        </div>
       </div>
-      <div class="card stat-card">
-        <div style="font-size:.68rem;color:var(--text-light);margin-bottom:4px">LÍQUIDO</div>
-        <div class="stat-value" id="home-net">R$ 0</div>
+      <div class="col-4">
+        <div class="mpa-card text-center">
+          <div style="font-size:.65rem;color:var(--muted);font-weight:700;letter-spacing:.5px">LÍQUIDO</div>
+          <div class="fw-800 mt-1" style="font-size:1.05rem" id="h-net">-</div>
+        </div>
       </div>
     </div>
 
     <!-- urgent -->
-    <div id="home-urgent"></div>
+    <div id="h-urgent"></div>
 
-    <!-- recent events -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <h3>Eventos recentes</h3>
-      <button class="btn btn-ghost btn-sm" onclick="Router.go('/eventos')">Ver todos →</button>
+    <!-- recent -->
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <span class="fw-700 small">Eventos recentes</span>
+      <button class="btn btn-ghost btn-sm" onclick="UI.go('eventos')">Ver todos →</button>
     </div>
-    <div id="home-events" class="flex flex-col gap-3"></div>
+    <div id="h-events"></div>
   </div>
 
-  <!-- FAB -->
-  <button class="fab" onclick="CreateEventModal.open()">+</button>
+  <button class="fab" onclick="EventModal.open()"><i class="bi bi-plus-lg"></i></button>
 </div>
 
-<!-- ════════════════════════════════════════════════════════
-     PAGE: EVENTOS (list)
-════════════════════════════════════════════════════════ -->
-<div id="page-eventos" class="page">
-  <div class="page-header">
-    <div>
-      <h2>Eventos</h2>
-      <div style="font-size:.78rem;color:var(--text-light)">Divida sem perder o controle</div>
-    </div>
-    <button class="btn btn-outline btn-sm" onclick="openJoinModal(()=>renderEventos())">🔑 Código</button>
+<!-- ════════ SCREEN: EVENTOS (list) ════════ -->
+<div id="screen-eventos" class="screen">
+  <div class="topbar">
+    <div class="topbar-title">Eventos</div>
+    <button class="btn btn-outline-teal btn-sm" onclick="UI.openJoinModal()">
+      <i class="bi bi-key me-1"></i>Entrar com código
+    </button>
   </div>
 
   <div class="page-content">
-    <!-- filters -->
-    <div class="filter-scroll" id="eventos-filters">
-      <div class="filter-chip active" data-filter="all">Todos</div>
-      <div class="filter-chip" data-filter="open">Abertos</div>
-      <div class="filter-chip" data-filter="closed">Encerrados</div>
-      <div class="filter-chip" data-filter="host">Anfitrião</div>
-      <div class="filter-chip" data-filter="guest">Convidado</div>
+    <div class="chip-scroll mb-3" id="ev-filters">
+      <span class="filter-chip active" data-f="all">Todos</span>
+      <span class="filter-chip" data-f="open">Abertos</span>
+      <span class="filter-chip" data-f="closed">Encerrados</span>
+      <span class="filter-chip" data-f="host">Anfitrião</span>
+      <span class="filter-chip" data-f="guest">Convidado</span>
     </div>
-    <div id="eventos-list" class="flex flex-col gap-3"></div>
+    <div id="ev-list"></div>
   </div>
 
-  <button class="fab" onclick="CreateEventModal.open()">+</button>
+  <button class="fab" onclick="EventModal.open()"><i class="bi bi-plus-lg"></i></button>
 </div>
 
-<!-- ════════════════════════════════════════════════════════
-     PAGE: EVENTO INTERNO
-════════════════════════════════════════════════════════ -->
-<div id="page-evento" class="page">
-  <div class="page-header">
-    <button class="back-btn" onclick="Router.go('/eventos')">← Voltar</button>
-    <div style="text-align:center;flex:1">
-      <div id="ev-title" style="font-weight:700;font-size:.95rem"></div>
-      <div id="ev-status-badge" style="margin-top:2px"></div>
-    </div>
-    <button id="ev-close-btn" class="btn btn-danger btn-sm" style="display:none">Encerrar</button>
+<!-- ════════ SCREEN: EVENTO DETALHE ════════ -->
+<div id="screen-evento" class="screen">
+  <div class="topbar">
+    <button class="btn btn-ghost btn-sm" onclick="UI.go('eventos')">
+      <i class="bi bi-arrow-left"></i>
+    </button>
+    <div class="topbar-title text-truncate" id="ev-topbar-title"></div>
+    <div id="ev-topbar-badges" class="d-flex gap-1"></div>
+    <button id="ev-menu-btn" class="btn btn-ghost btn-sm d-none" data-bs-toggle="dropdown">
+      <i class="bi bi-three-dots-vertical"></i>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+      <li><a class="dropdown-item" href="#" onclick="EventDetail.confirmClose()"><i class="bi bi-lock me-2 text-danger"></i>Encerrar evento</a></li>
+      <li><a class="dropdown-item" href="#" onclick="EventDetail.shareCode()"><i class="bi bi-share me-2"></i>Compartilhar código</a></li>
+    </ul>
   </div>
 
-  <!-- sub-header metrics -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 20px;border-bottom:1px solid var(--border-dark)">
-    <div>
-      <div style="font-size:.7rem;color:var(--text-light)">TOTAL DO EVENTO</div>
-      <div id="ev-total" style="font-weight:700;font-size:1.1rem"></div>
+  <!-- metrics row -->
+  <div class="px-3 py-2 border-bottom" style="border-color:var(--border)!important">
+    <div class="row g-2 mb-2">
+      <div class="col-6">
+        <div class="small text-muted">Total do evento</div>
+        <div class="fw-700" id="ev-total-val">-</div>
+      </div>
+      <div class="col-6 text-end">
+        <div class="small text-muted">Meu saldo</div>
+        <div class="fw-700" id="ev-my-bal">-</div>
+      </div>
     </div>
-    <div style="text-align:right">
-      <div style="font-size:.7rem;color:var(--text-light)">MEU SALDO</div>
-      <div id="ev-mybal" style="font-weight:700;font-size:1.1rem"></div>
-    </div>
-  </div>
-  <div style="padding:8px 20px;border-bottom:1px solid var(--border-dark)">
-    <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-light);margin-bottom:4px">
+    <div class="small text-muted mb-1 d-flex justify-content-between">
       <span>Participantes quites</span>
-      <span id="ev-progress-label"></span>
+      <span id="ev-prog-label"></span>
     </div>
-    <div class="progress-bar"><div class="progress-fill" id="ev-progress-fill" style="width:0%"></div></div>
+    <div class="prog-bar"><div class="prog-fill" id="ev-prog-fill" style="width:0%"></div></div>
   </div>
 
-  <!-- nudge banner -->
-  <div style="padding:0 20px;margin-top:10px">
-    <div class="nudge-banner hidden" id="nudge-banner">
-      <span style="font-size:1.2rem">⚠️</span>
-      <div class="nudge-text flex-1"></div>
-      <button class="nudge-close" onclick="document.getElementById('nudge-banner').classList.add('hidden')">✕</button>
-    </div>
-  </div>
+  <!-- nudge -->
+  <div class="px-3 pt-2" id="ev-nudge-wrap"></div>
 
   <!-- tabs -->
-  <div style="padding:0 20px">
-    <div class="tabs-bar">
-      <button class="tab-btn ev-tab" data-tab="despesas">🧾 Despesas</button>
-      <button class="tab-btn ev-tab" data-tab="saldos">⚖️ Saldos</button>
-      <button class="tab-btn ev-tab" data-tab="pessoas">👥 Pessoas</button>
-    </div>
+  <div class="mpa-tabs px-3">
+    <button class="mpa-tab active" data-tab="despesas" onclick="EventDetail.switchTab('despesas',this)">
+      <i class="bi bi-receipt me-1"></i>Despesas
+    </button>
+    <button class="mpa-tab" data-tab="saldos" onclick="EventDetail.switchTab('saldos',this)">
+      <i class="bi bi-scale me-1"></i>Saldos
+    </button>
+    <button class="mpa-tab" data-tab="pessoas" onclick="EventDetail.switchTab('pessoas',this)">
+      <i class="bi bi-people me-1"></i>Pessoas
+    </button>
   </div>
 
-  <div style="padding:0 20px 80px">
-    <!-- Despesas pane -->
-    <div class="ev-tab-pane" data-pane="despesas">
-      <div id="ev-expenses-list"></div>
+  <div class="page-content pt-3">
+    <!-- DESPESAS tab -->
+    <div class="tab-pane active" id="tp-despesas">
+      <div id="exp-list"></div>
     </div>
 
-    <!-- Saldos pane -->
-    <div class="ev-tab-pane" data-pane="saldos">
-      <div id="ev-mybal-card" class="card" style="margin-bottom:16px;border-radius:14px;padding:16px"></div>
-
-      <h4 style="margin-bottom:10px">Resumo dos participantes</h4>
-      <div id="ev-balances-list" style="margin-bottom:20px"></div>
-
-      <h4 style="margin-bottom:10px">Quem paga quem</h4>
-      <div id="ev-settlements"></div>
+    <!-- SALDOS tab -->
+    <div class="tab-pane" id="tp-saldos">
+      <div id="my-balance-card" class="mpa-card mb-3"></div>
+      <div class="fw-600 small mb-2">Resumo dos participantes</div>
+      <div id="balances-list" class="mb-3"></div>
+      <div class="fw-600 small mb-2">Quem paga quem</div>
+      <div id="settlement-list"></div>
     </div>
 
-    <!-- Pessoas pane -->
-    <div class="ev-tab-pane" data-pane="pessoas">
-      <div id="ev-participants-list" style="margin-bottom:20px"></div>
-
-      <!-- invite code -->
-      <div class="code-box" style="margin-top:12px">
-        <div style="font-size:.75rem;color:var(--text-light);margin-bottom:4px">CÓDIGO DE CONVITE</div>
-        <div class="code-display" id="ev-invite-code"></div>
-        <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" id="ev-copy-code">📋 Copiar</button>
-          <a class="btn btn-ghost btn-sm" id="ev-wa-code" href="#" target="_blank">📱 WhatsApp</a>
-        </div>
+    <!-- PESSOAS tab -->
+    <div class="tab-pane" id="tp-pessoas">
+      <div id="participants-list" class="mb-3"></div>
+      <div class="code-display mb-2" id="ev-invite-code"></div>
+      <div class="d-flex gap-2 justify-content-center flex-wrap">
+        <button class="btn btn-ghost btn-sm" onclick="copyText(App.currentEvent?.code,'Código copiado!')">
+          <i class="bi bi-clipboard me-1"></i>Copiar
+        </button>
+        <a id="ev-wa-btn" class="btn btn-ghost btn-sm" href="#" target="_blank">
+          <i class="bi bi-whatsapp me-1" style="color:#25d366"></i>WhatsApp
+        </a>
       </div>
     </div>
   </div>
 
-  <!-- FAB -->
-  <button class="fab" id="fab-add-expense">+</button>
+  <button class="fab" id="fab-despesa" onclick="ExpenseModal.open()"><i class="bi bi-plus-lg"></i></button>
 </div>
 
-<!-- ════════════════════════════════════════════════════════
-     PAGE: PERFIL
-════════════════════════════════════════════════════════ -->
-<div id="page-perfil" class="page">
-  <div class="page-header">
-    <h2>Perfil</h2>
-    <button class="btn btn-ghost btn-sm" onclick="if(confirm('Sair da conta?')){State.logout();Router.go('/')}">Sair</button>
+<!-- ════════ SCREEN: PERFIL ════════ -->
+<div id="screen-perfil" class="screen">
+  <div class="topbar">
+    <div class="topbar-title">Perfil</div>
+    <button class="btn btn-danger btn-sm" onclick="UI.logout()">Sair</button>
   </div>
-
   <div class="page-content">
-    <div style="text-align:center;margin-bottom:24px">
-      <div id="perfil-avatar" style="margin:0 auto 12px;width:88px;height:88px"></div>
-      <h3 id="perfil-name"></h3>
-      <div id="perfil-email" style="font-size:.85rem;color:var(--text-light)"></div>
+    <div class="text-center mb-4">
+      <div id="perf-av" class="mb-2" style="display:flex;justify-content:center"></div>
+      <h5 class="fw-700 mb-0" id="perf-name"></h5>
+      <div class="small text-muted" id="perf-email"></div>
     </div>
 
-    <div class="card" style="margin-bottom:16px">
-      <h4 style="margin-bottom:12px">🔑 Minhas chaves PIX</h4>
-      <div id="perfil-pix-list"></div>
+    <div class="mpa-card mb-3">
+      <div class="fw-600 mb-2"><i class="bi bi-qr-code me-2" style="color:var(--teal)"></i>Minhas chaves PIX</div>
+      <div id="perf-pix"></div>
     </div>
 
-    <div class="card" style="margin-bottom:16px">
-      <h4 style="margin-bottom:12px">📊 Meus eventos</h4>
-      <div id="perfil-events"></div>
+    <div class="mpa-card mb-3">
+      <div class="fw-600 mb-2"><i class="bi bi-graph-up me-2" style="color:var(--teal)"></i>Estatísticas</div>
+      <div id="perf-stats" class="row g-2 text-center"></div>
     </div>
 
-    <div class="card">
-      <h4 style="margin-bottom:8px">ℹ️ Sobre o app</h4>
-      <p style="font-size:.82rem;color:var(--text-light)">Me Paga Aí v1.0 · Finspace</p>
-      <p style="font-size:.78rem;color:var(--text-light);margin-top:4px">TCC de Engenharia de Computação · Inteli 2025</p>
-      <p style="font-size:.78rem;color:var(--text-light);margin-top:4px">Autor: Murilo Prianti</p>
+    <div class="mpa-card">
+      <div class="fw-600 mb-1"><i class="bi bi-info-circle me-2" style="color:var(--teal)"></i>Sobre</div>
+      <p class="small text-muted mb-0">Me Paga Aí v2.0 · Finspace<br>TCC Engenharia de Computação · Inteli 2025<br>Autor: Murilo Prianti</p>
     </div>
   </div>
 </div>
 
-<!-- ── BOTTOM NAV ─────────────────────────────────────────── -->
-<nav class="bottom-nav" id="bottom-nav">
-  <button class="nav-tab" data-page="home" onclick="Router.go('/home')">
-    <span class="nav-icon">🏠</span>Home
+<!-- ═══════════════════════════════════════════
+     BOTTOM NAV
+═══════════════════════════════════════════ -->
+<nav id="bottom-nav">
+  <button class="nav-btn" data-screen="home"    onclick="UI.go('home')">
+    <i class="bi bi-house-fill"></i>Home
   </button>
-  <button class="nav-tab" data-page="eventos" onclick="Router.go('/eventos')">
-    <span class="nav-icon">🤝</span>Eventos
+  <button class="nav-btn" data-screen="eventos" onclick="UI.go('eventos')">
+    <i class="bi bi-handshake-fill"></i>Eventos
   </button>
-  <button class="nav-tab" data-page="perfil" onclick="Router.go('/perfil')">
-    <span class="nav-icon">👤</span>Perfil
+  <button class="nav-btn" data-screen="perfil"  onclick="UI.go('perfil')">
+    <i class="bi bi-person-fill"></i>Perfil
   </button>
 </nav>
 
-<!-- ── SCRIPTS ────────────────────────────────────────────── -->
-<script src="js/state.js"></script>
-<script src="js/router.js"></script>
-<script src="js/modals.js"></script>
-<script src="js/pages.js"></script>
+<!-- ═══════════════════════════════════════════
+     MODALS
+═══════════════════════════════════════════ -->
+
+<!-- JOIN BY CODE -->
+<div class="modal fade" id="modal-join" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-700"><i class="bi bi-key me-2" style="color:var(--teal)"></i>Entrar com código</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">Código do evento</label>
+        <input id="join-code-inp" class="form-control text-center fw-700" placeholder="FIN-XXXX"
+          maxlength="8" style="letter-spacing:4px;font-size:1.3rem" autocapitalize="characters">
+        <div class="small text-muted mt-2">
+          Peça o código para o anfitrião do evento. Exemplo: <strong>FIN-DEMO</strong> para o evento de demonstração.
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-teal w-100 py-2 fw-600" onclick="UI.joinByCode()">
+          <i class="bi bi-arrow-right-circle me-2"></i>Entrar no evento
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE EVENT (3 steps) -->
+<div class="modal fade" id="modal-event" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content" style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-700" id="ev-modal-title">Novo evento</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="stepper mb-4" id="em-stepper"></div>
+        <div id="em-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD EXPENSE -->
+<div class="modal fade" id="modal-expense" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content" style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-700"><i class="bi bi-receipt me-2" style="color:var(--teal)"></i>Adicionar despesa</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="exp-modal-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PIX QR CODE -->
+<div class="modal fade" id="modal-pix" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-700"><i class="bi bi-qr-code me-2" style="color:var(--teal)"></i>Cobrar via PIX</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="pix-modal-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CLOSE EVENT CONFIRM -->
+<div class="modal fade" id="modal-close-ev" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px">
+      <div class="modal-header border-0 pb-1">
+        <h5 class="modal-title fw-700 text-danger"><i class="bi bi-lock me-2"></i>Encerrar evento?</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body small text-muted">
+        Após encerrar, nenhuma nova despesa poderá ser adicionada. Os saldos ficam visíveis até todos pagarem.
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-ghost" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-danger fw-600" onclick="EventDetail.doClose()">Encerrar evento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ SCRIPTS ════ -->
+<script src="js/db.js"></script>
+<script src="js/app.js"></script>
 <script>
 'use strict';
 
-// Fix tab rendering: remap data-tab to pane IDs
-document.querySelectorAll('.ev-tab').forEach(t => {
-  if (t.dataset.tab === 'pessoas') t.dataset.tab = 'pessoas';
-});
-document.querySelectorAll('.ev-tab-pane').forEach(p => {
-  if (p.dataset.pane === 'pessoas') {}
-});
-// re-alias tab 'pessoas' → 'pessoas' (already correct above)
+// ── BOOTSTRAP MODAL HELPERS ────────────────────────────────────────────────
+const _bsModal = {};
+function getModal(id) {
+  if (!_bsModal[id]) _bsModal[id] = new bootstrap.Modal(document.getElementById(id));
+  return _bsModal[id];
+}
+function showModal(id)  { getModal(id).show(); }
+function hideModal(id)  { getModal(id).hide(); }
 
-// ── INIT ─────────────────────────────────────────────────────
-function boot() {
-  const restored = State.restore();
+// ── UI CONTROLLER ──────────────────────────────────────────────────────────
+const UI = {
+  current: null,
 
-  // Handle pending code from sessionStorage (arrived from landing without login)
-  // already handled in OnboardingPage
+  go(screen) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-'+screen).classList.add('active');
+    this.current = screen;
 
-  Router.on('/', () => {
-    if (restored) Router.go('/home');
-    else { Pages.show('landing'); document.getElementById('bottom-nav').style.display = 'none'; }
-  });
+    const navScreens = ['home','eventos','perfil'];
+    const nav = document.getElementById('bottom-nav');
+    nav.classList.toggle('show', navScreens.includes(screen));
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.screen === screen);
+    });
 
-  Router.on('/onboarding', () => {
-    Pages.show('onboarding');
-    document.getElementById('bottom-nav').style.display = 'none';
-    OnboardingPage.render();
-  });
+    // per-screen render
+    if (screen === 'home')    Home.render();
+    if (screen === 'eventos') EventList.render();
+    if (screen === 'perfil')  Perfil.render();
+    if (screen === 'onboarding') Onboarding.setStep(1);
+  },
 
-  Router.on('/home', () => {
-    if (!State.user) { Router.go('/'); return; }
-    renderHome();
-  });
+  openJoinModal() {
+    document.getElementById('join-code-inp').value = '';
+    showModal('modal-join');
+  },
 
-  Router.on('/eventos', () => {
-    if (!State.user) { Router.go('/'); return; }
-    renderEventos();
-  });
+  async joinByCode() {
+    const code = document.getElementById('join-code-inp').value.trim().toUpperCase();
+    if (code.length < 3) { toast('Digite o código do evento', 'error'); return; }
 
-  Router.on('/evento', (id) => {
-    if (!State.user) { Router.go('/'); return; }
-    // hide bottom-nav on event detail
-    document.getElementById('bottom-nav').style.display = 'none';
-    EventPage.render(id);
-  });
-
-  Router.on('/perfil', () => {
-    if (!State.user) { Router.go('/'); return; }
-    renderPerfil();
-  });
-
-  // restore bottom nav when leaving event detail
-  window.addEventListener('hashchange', () => {
-    const hash = window.location.hash.slice(1) || '/';
-    const noNav = ['/', '/onboarding'];
-    const isEventDetail = hash.startsWith('/evento/');
-    if (noNav.some(r => hash === r) || isEventDetail) {
-      document.getElementById('bottom-nav').style.display = 'none';
+    if (!App.user) {
+      // save pending code and go to onboarding
+      sessionStorage.setItem('pending_code', code);
+      hideModal('modal-join');
+      this.go('onboarding');
+      return;
     }
-  });
 
-  Router.start();
+    const btn = document.querySelector('#modal-join .btn-teal');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Buscando...';
+    btn.disabled = true;
 
-  // ONBOARDING: fix tab references for evento page
-  // 'pessoas' tab pane needs to be matched correctly
-  document.querySelectorAll('.ev-tab').forEach(btn => {
-    const map = { 'despesas':'despesas','saldos':'saldos','pessoas':'pessoas' };
-    const orig = btn.dataset.tab;
-    btn.onclick = () => {
-      const tab = orig;
-      document.querySelectorAll('.ev-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-      document.querySelectorAll('.ev-tab-pane').forEach(p => p.classList.toggle('active', p.dataset.pane === tab));
-      const evId = State.currentEventId;
-      if (tab === 'despesas') EventPage.renderExpenses();
-      else if (tab === 'saldos') EventPage.renderSaldos();
+    const ev = await App.joinByCode(code);
+
+    btn.innerHTML = '<i class="bi bi-arrow-right-circle me-2"></i>Entrar no evento';
+    btn.disabled = false;
+
+    if (!ev) { toast('Código não encontrado. Verifique e tente novamente.', 'error'); return; }
+    hideModal('modal-join');
+    toast(`Você entrou em "${ev.name}" 🎉`);
+    App.currentEvent = ev;
+    EventDetail.render(ev);
+    this.go('evento');
+  },
+
+  logout() {
+    if (!confirm('Sair da conta?')) return;
+    App.logout();
+    this.go('landing');
+  }
+};
+
+// ── ONBOARDING ─────────────────────────────────────────────────────────────
+const Onboarding = (() => {
+  let step = 1;
+  let pixKeys = [];
+  let photoB64 = null;
+
+  function setStep(s) {
+    step = s;
+    renderStepper();
+    ['ob-s1','ob-s2','ob-s3'].forEach((id,i) => {
+      document.getElementById(id).classList.toggle('d-none', i+1 !== s);
+    });
+    if (s === 3) renderStep3();
+  }
+
+  function renderStepper() {
+    document.getElementById('ob-stepper').innerHTML = [1,2,3].map((n,i) => `
+      <div class="step-node ${n<step?'done':n===step?'active':'pending'}">${n<step?'✓':n}</div>
+      ${i<2?`<div class="step-line flex-fill ${n<step?'done':''}"></div>`:''}
+    `).join('');
+  }
+
+  function addPix() {
+    const type = document.getElementById('ob-pix-type').value;
+    const val  = document.getElementById('ob-pix-val').value.trim();
+    if (!val) { toast('Informe o valor da chave','error'); return; }
+    pixKeys.push({ type, value: val });
+    document.getElementById('ob-pix-val').value = '';
+    renderPixList();
+  }
+
+  function renderPixList() {
+    document.getElementById('ob-pix-list').innerHTML = pixKeys.map((k,i) => `
+      <div class="pix-key-row mb-2">
+        <div>
+          <div style="font-size:.7rem;color:var(--muted)">${k.type.toUpperCase()}</div>
+          <div style="font-size:.88rem;font-weight:600">${k.value}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="Onboarding.removePix(${i})"><i class="bi bi-x text-danger"></i></button>
+      </div>`).join('') || '<div class="small text-muted text-center py-2">Nenhuma chave ainda</div>';
+  }
+
+  function next1() {
+    const name  = document.getElementById('ob-name').value.trim();
+    const email = document.getElementById('ob-email').value.trim();
+    if (!name)  { toast('Informe seu nome','error'); return; }
+    if (!email || !email.includes('@')) { toast('E-mail inválido','error'); return; }
+    setStep(2);
+  }
+
+  function next2() { setStep(3); }
+
+  function renderStep3() {
+    const name  = document.getElementById('ob-name').value.trim();
+    const pending = sessionStorage.getItem('pending_code');
+    let pendingBlock = '';
+    if (pending) {
+      pendingBlock = `<div class="mpa-card mb-3 text-start" style="border-color:var(--teal)">
+        <div class="small fw-700" style="color:var(--teal)">CONVITE PENDENTE</div>
+        <div class="fw-600">Código: <strong>${pending}</strong></div>
+        <div class="small text-muted">Você vai entrar neste evento após criar seu perfil.</div>
+      </div>`;
+    }
+    document.getElementById('ob-s3-content').innerHTML = `
+      <div style="font-size:3rem">✅</div>
+      <h4 class="fw-700 mt-2">Bem-vindo(a), ${name.split(' ')[0]}!</h4>
+      <p class="text-muted mb-4">Seu perfil está criado.</p>
+      ${pendingBlock}
+      <div class="d-grid gap-2">
+        ${pending ? `<button class="btn btn-teal py-2" onclick="Onboarding.finish(true)"><i class="bi bi-arrow-right-circle me-2"></i>Entrar no evento pendente</button>` : ''}
+        <button class="btn ${pending?'btn-ghost':'btn-teal'} py-2" onclick="Onboarding.finish(false)">
+          ${pending ? 'Ir para o início →' : '<i class="bi bi-house me-2"></i>Entrar no app'}
+        </button>
+      </div>`;
+  }
+
+  async function finish(joinPending) {
+    const name  = document.getElementById('ob-name').value.trim();
+    const email = document.getElementById('ob-email').value.trim();
+    App.register({ name, email, photo: photoB64, pixKeys });
+
+    if (joinPending) {
+      const code = sessionStorage.getItem('pending_code');
+      sessionStorage.removeItem('pending_code');
+      if (code) {
+        const ev = await App.joinByCode(code);
+        if (ev) {
+          toast(`Bem-vindo(a), ${name.split(' ')[0]}! Entrou em "${ev.name}" 🎉`);
+          App.currentEvent = ev;
+          EventDetail.render(ev);
+          UI.go('evento');
+          return;
+        }
+      }
+    }
+
+    toast(`Bem-vindo(a), ${name.split(' ')[0]}! 👋`);
+    UI.go('home');
+  }
+
+  // photo
+  document.getElementById('ob-photo-inp').onchange = function() {
+    const file = this.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = e => {
+      photoB64 = e.target.result;
+      const circle = document.getElementById('ob-photo-circle');
+      circle.innerHTML = `<img src="${photoB64}" style="width:100%;height:100%;object-fit:cover">`;
     };
-  });
+    r.readAsDataURL(file);
+  };
+
+  return { setStep, addPix, removePix: (i)=>{ pixKeys.splice(i,1); renderPixList(); }, next1, next2, finish };
+})();
+
+// ── HOME ───────────────────────────────────────────────────────────────────
+const Home = {
+  render() {
+    const u = App.user; if (!u) return;
+    document.getElementById('home-greeting').textContent = `${greet()}, ${u.name.split(' ')[0]}.`;
+    document.getElementById('home-av').innerHTML = avatarHTML(u.name, u.photo, 36);
+
+    const { toReceive, toPay } = App.dashTotals();
+    const net = toReceive - toPay;
+    document.getElementById('h-receive').textContent = fmt(toReceive);
+    document.getElementById('h-pay').textContent     = fmt(toPay);
+    const netEl = document.getElementById('h-net');
+    netEl.textContent  = fmt(Math.abs(net));
+    netEl.style.color  = net >= 0 ? 'var(--teal)' : 'var(--red)';
+
+    const pendingN = App.events.filter(ev => App.myBalance(ev) < -0.005).length;
+    document.getElementById('home-subtitle').textContent = pendingN > 0
+      ? `Você tem ${pendingN} pendência(s) em aberto.`
+      : 'Você está quite em todos os eventos ✓';
+
+    // urgent
+    const urgEl = document.getElementById('h-urgent');
+    const urgents = App.events.filter(ev => App.myBalance(ev) < -0.005 && ev.status === 'open');
+    urgEl.innerHTML = urgents.map(ev => {
+      const bal = Math.abs(App.myBalance(ev));
+      return `<div class="nudge-bar mb-2" onclick="EventDetail.render(ev);UI.go('evento')" style="cursor:pointer">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <div class="flex-fill"><strong>${fmt(bal)}</strong> a pagar em <em>${ev.name}</em></div>
+        <span>→</span>
+      </div>`;
+    }).join('');
+
+    // recent events
+    const evEl = document.getElementById('h-events');
+    const recent = App.events.slice(0,3);
+    evEl.innerHTML = recent.length ? recent.map(ev => eventCardHTML(ev)).join('') :
+      `<div class="text-center py-4 text-muted"><i class="bi bi-calendar-x" style="font-size:2rem;display:block;opacity:.3"></i><div class="mt-2 small">Nenhum evento ainda</div><button class="btn btn-teal btn-sm mt-2" onclick="EventModal.open()">+ Criar evento</button></div>`;
+  }
+};
+
+// ── EVENT LIST ─────────────────────────────────────────────────────────────
+const EventList = {
+  filter: 'all',
+  render() {
+    const uid = App.user?.id;
+    let evs = App.events;
+    if (this.filter === 'open')   evs = evs.filter(e => e.status==='open');
+    if (this.filter === 'closed') evs = evs.filter(e => e.status==='closed');
+    if (this.filter === 'host')   evs = evs.filter(e => e.hostId===uid);
+    if (this.filter === 'guest')  evs = evs.filter(e => e.hostId!==uid);
+
+    document.querySelectorAll('#ev-filters .filter-chip').forEach(c => {
+      c.classList.toggle('active', c.dataset.f === this.filter);
+      c.onclick = () => { this.filter = c.dataset.f; this.render(); };
+    });
+
+    document.getElementById('ev-list').innerHTML = evs.length ? evs.map(ev => eventCardHTML(ev)).join('') :
+      `<div class="text-center py-5 text-muted">
+        <i class="bi bi-search" style="font-size:2.5rem;opacity:.3"></i>
+        <div class="mt-2">Nenhum evento nesta categoria</div>
+        <button class="btn btn-outline-teal btn-sm mt-2" onclick="EventModal.open()">+ Novo evento</button>
+       </div>`;
+  }
+};
+
+function eventCardHTML(ev) {
+  const bal   = App.myBalance(ev);
+  const total = ev.expenses.reduce((a,e)=>a+e.amount,0);
+  const isHost = ev.hostId === App.user?.id;
+  return `
+  <div class="mpa-card clickable mb-2" onclick="openEventDetail('${ev.code}')">
+    <div class="d-flex align-items-start gap-2 mb-2">
+      <div class="event-emoji">${ev.emoji}</div>
+      <div class="flex-fill min-w-0">
+        <div class="fw-700 text-truncate">${ev.name}</div>
+        <div class="small text-muted"><i class="bi bi-people me-1"></i>${ev.participants.length} · <i class="bi bi-calendar me-1"></i>${fmtDateLong(ev.date)}</div>
+        <div class="d-flex gap-1 flex-wrap mt-1">
+          <span class="badge badge-${ev.status==='open'?'teal':'red'}">${ev.status==='open'?'Aberto':'Encerrado'}</span>
+          <span class="badge badge-gray">${ev.type}</span>
+          <span class="badge badge-${isHost?'teal':'gray'}">${isHost?'Anfitrião':'Convidado'}</span>
+        </div>
+      </div>
+    </div>
+    <div class="d-flex justify-content-between pt-2" style="border-top:1px solid var(--border)">
+      <div><div class="small text-muted">Total</div><div class="fw-700">${fmt(total)}</div></div>
+      <div class="text-end">
+        <div class="small" style="color:${Math.abs(bal)<.01?'var(--teal)':bal>0?'var(--teal)':'var(--red)'}">${Math.abs(bal)<.01?'Quite':bal>0?'A receber':'Você deve'}</div>
+        <div class="fw-700" style="color:${Math.abs(bal)<.01?'var(--teal)':bal>0?'var(--teal)':'var(--red)'}">${fmt(Math.abs(bal))}</div>
+      </div>
+    </div>
+  </div>`;
 }
 
-document.addEventListener('DOMContentLoaded', boot);
+async function openEventDetail(code) {
+  const ev = App.events.find(e=>e.code===code) || await Database.getEventByCode(code);
+  if (!ev) { toast('Evento não encontrado','error'); return; }
+  App.currentEvent = ev;
+  EventDetail.render(ev);
+  UI.go('evento');
+}
+
+// ── EVENT DETAIL ────────────────────────────────────────────────────────────
+const EventDetail = {
+  activeTab: 'despesas',
+
+  render(ev) {
+    App.currentEvent = ev;
+    const isHost = ev.hostId === App.user?.id;
+    const total  = ev.expenses.reduce((a,e)=>a+e.amount,0);
+    const bal    = App.myBalance(ev);
+
+    document.getElementById('ev-topbar-title').textContent = `${ev.emoji} ${ev.name}`;
+
+    const badges = document.getElementById('ev-topbar-badges');
+    badges.innerHTML = `<span class="badge badge-${ev.status==='open'?'teal':'red'}">${ev.status==='open'?'Aberto':'Encerrado'}</span>`;
+
+    const menuBtn = document.getElementById('ev-menu-btn');
+    menuBtn.classList.toggle('d-none', !isHost || ev.status!=='open');
+
+    document.getElementById('ev-total-val').textContent = fmt(total);
+    const myBalEl = document.getElementById('ev-my-bal');
+    if (Math.abs(bal) < .01) {
+      myBalEl.innerHTML = '<span style="color:var(--teal)">Quite ✓</span>';
+    } else {
+      myBalEl.innerHTML = `<span style="color:${bal>0?'var(--teal)':'var(--red)'}">${bal>0?'A receber':'Você deve'} ${fmt(Math.abs(bal))}</span>`;
+    }
+
+    const balances = App.calcBalances(ev);
+    const quite = balances.filter(b=>Math.abs(b.net)<.01).length;
+    const pct   = Math.round(quite/balances.length*100);
+    document.getElementById('ev-prog-fill').style.width  = pct+'%';
+    document.getElementById('ev-prog-label').textContent = `${quite}/${balances.length}`;
+
+    document.getElementById('ev-invite-code').textContent = ev.code;
+    const waText = encodeURIComponent(`Olá! Você foi convidado para o evento *${ev.name}* no Me Paga Aí.\nUse o código *${ev.code}* para participar!\n\n👉 https://SEU-USUARIO.github.io/mepagaai/`);
+    document.getElementById('ev-wa-btn').href = `https://wa.me/?text=${waText}`;
+
+    document.getElementById('fab-despesa').classList.toggle('hidden', ev.status !== 'open');
+
+    this.switchTab(this.activeTab);
+    this.renderExpenses();
+    this.renderSaldos();
+    this.renderParticipants();
+  },
+
+  switchTab(tab, el) {
+    this.activeTab = tab;
+    document.querySelectorAll('.mpa-tab').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id==='tp-'+tab));
+  },
+
+  renderExpenses() {
+    const ev = App.currentEvent; if (!ev) return;
+    const uid = App.user?.id;
+    const el  = document.getElementById('exp-list');
+    if (!ev.expenses.length) {
+      el.innerHTML = `<div class="text-center py-5 text-muted">
+        <i class="bi bi-receipt" style="font-size:2.5rem;opacity:.3"></i>
+        <div class="mt-2">Nenhuma despesa ainda</div>
+        ${ev.status==='open'?`<button class="btn btn-teal btn-sm mt-2" onclick="ExpenseModal.open()">+ Adicionar despesa</button>`:''}
+      </div>`;
+      return;
+    }
+    el.innerHTML = [...ev.expenses].reverse().map(exp => {
+      const payer = ev.participants.find(p=>p.id===exp.paidBy);
+      const myCota = exp.splitEqually ? exp.amount/ev.participants.length : (exp.splits?.[uid]||0);
+      return `
+      <div class="mpa-card mb-2">
+        <div class="d-flex gap-2 align-items-start">
+          ${exp.photo
+            ? `<img src="${exp.photo}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0">`
+            : `<div style="width:48px;height:48px;background:var(--card-alt);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0">${catEmoji(exp.cat)}</div>`}
+          <div class="flex-fill">
+            <div class="fw-700">${exp.desc}</div>
+            <div class="small text-muted">Pago por <strong class="text-white">${payer?.name||'?'}</strong> · ${fmtDateLong(exp.date)}</div>
+            <span class="badge badge-gray small">${exp.cat}</span>
+          </div>
+          <div class="text-end flex-shrink-0">
+            <div class="fw-700">${fmt(exp.amount)}</div>
+            ${myCota>0?`<div class="small" style="color:var(--amber)">Sua cota: ${fmt(myCota)}</div>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  },
+
+  renderSaldos() {
+    const ev = App.currentEvent; if (!ev) return;
+    const uid       = App.user?.id;
+    const balances  = App.calcBalances(ev);
+    const transfers = App.calcSettlement(ev);
+    const myBal     = balances.find(b=>b.id===uid);
+
+    // my balance card
+    const mbEl = document.getElementById('my-balance-card');
+    if (!myBal || Math.abs(myBal.net)<.01) {
+      mbEl.style.cssText = 'background:rgba(29,158,117,.1);border-color:var(--teal)';
+      mbEl.innerHTML = `<div class="fw-700 text-center" style="color:var(--teal)">✓ Você está quite neste evento!</div>`;
+    } else if (myBal.net > 0) {
+      mbEl.style.cssText = 'background:rgba(29,158,117,.1);border-color:var(--teal)';
+      mbEl.innerHTML = `<div class="small fw-700" style="color:var(--teal)">A RECEBER</div>
+        <div class="fw-800" style="font-size:1.5rem;color:var(--teal)">${fmt(myBal.net)}</div>`;
+    } else {
+      mbEl.style.cssText = 'background:rgba(239,68,68,.1);border-color:var(--red)';
+      const debt = transfers.find(t=>t.fromId===uid&&!t.settled);
+      mbEl.innerHTML = `<div class="small fw-700" style="color:var(--red)">VOCÊ DEVE</div>
+        <div class="fw-800" style="font-size:1.5rem;color:var(--red)">${fmt(Math.abs(myBal.net))}</div>
+        ${debt?`<div class="small mt-1">para <strong>${debt.toName}</strong></div>
+          <button class="btn btn-danger btn-sm mt-2" onclick="openPixModal('${debt.toName}','${debt.toPix||''}',${debt.amount})">
+            <i class="bi bi-qr-code me-1"></i>Pagar agora via PIX
+          </button>`:''}`;
+    }
+
+    // all balances
+    document.getElementById('balances-list').innerHTML = balances.map(b => `
+      <div class="d-flex align-items-center gap-2 py-2" style="border-bottom:1px solid var(--border)">
+        ${avatarHTML(b.name,null,36)}
+        <div class="flex-fill">
+          <div class="fw-600 small">${b.name}${b.isHost?` <span class="badge badge-teal">Host</span>`:''}</div>
+          <div class="small text-muted">Pagou: ${fmt(b.totalPaid)}</div>
+        </div>
+        <div class="text-end">
+          <div class="fw-700" style="color:${Math.abs(b.net)<.01?'var(--teal)':b.net>0?'var(--teal)':'var(--red)'}">
+            ${Math.abs(b.net)<.01?'Quite ✓':(b.net>0?'+':'')+fmt(b.net)}
+          </div>
+        </div>
+      </div>`).join('');
+
+    // settlements
+    const pending = transfers.filter(t=>!t.settled);
+    document.getElementById('settlement-list').innerHTML = pending.length
+      ? pending.map(t => `
+        <div class="settle-row">
+          ${avatarHTML(t.fromName,null,34)}
+          <div class="flex-fill">
+            <div class="small fw-600">${t.fromName} → ${t.toName}</div>
+            <div class="fw-700" style="color:var(--amber)">${fmt(t.amount)}</div>
+          </div>
+          <div class="d-flex flex-column gap-1">
+            <button class="btn btn-outline-teal btn-sm" onclick="openPixModal('${t.toName}','${t.toPix||''}',${t.amount})">
+              <i class="bi bi-qr-code"></i>
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="doMarkSettled('${ev.code}','${t.fromId}','${t.toId}')">
+              <i class="bi bi-check2 text-success"></i>
+            </button>
+          </div>
+        </div>`)
+        .join('')
+      : `<div class="text-center py-3" style="color:var(--teal)"><i class="bi bi-check-circle me-1"></i>Todos os saldos estão zerados!</div>`;
+  },
+
+  renderParticipants() {
+    const ev = App.currentEvent; if (!ev) return;
+    document.getElementById('participants-list').innerHTML = ev.participants.map(p => `
+      <div class="d-flex align-items-center gap-2 py-2" style="border-bottom:1px solid var(--border)">
+        ${avatarHTML(p.name,null,38)}
+        <div class="flex-fill">
+          <div class="fw-600">${p.name}</div>
+          <span class="badge badge-${p.isHost?'teal':'gray'}">${p.isHost?'Anfitrião':'Convidado'}</span>
+        </div>
+        ${p.pix?`<div class="small text-muted text-end"><i class="bi bi-qr-code me-1"></i>${p.pix.slice(0,14)}${p.pix.length>14?'…':''}</div>`:''}
+      </div>`).join('');
+  },
+
+  confirmClose() { showModal('modal-close-ev'); },
+  async doClose() {
+    const ev = App.currentEvent; if (!ev) return;
+    hideModal('modal-close-ev');
+    await App.closeEvent(ev.code);
+    toast('Evento encerrado 🔒');
+    this.render(ev);
+  },
+  shareCode() {
+    const ev = App.currentEvent; if (!ev) return;
+    const waText = encodeURIComponent(`Código do evento *${ev.name}*: *${ev.code}*\nEntre no Me Paga Aí para participar!`);
+    window.open('https://wa.me/?text='+waText, '_blank');
+  }
+};
+
+async function doMarkSettled(code, fromId, toId) {
+  await App.markSettled(code, fromId, toId);
+  toast('Pagamento confirmado ✓');
+  EventDetail.renderSaldos();
+}
+
+// ── CREATE EVENT MODAL ─────────────────────────────────────────────────────
+const EventModal = (() => {
+  let step = 1;
+  let data = {};
+  let extraParts = [];
+  let genCode = null;
+
+  const typeEmojis = {'Refeição':'🍖','Viagem':'✈️','Compras':'🛒','Moradia':'🏠',
+                      'Festa':'🎉','Lazer':'🏖️','Saúde':'💊','Educação':'🎓','Outro':'📦'};
+
+  function open() { step=1; data={}; extraParts=[]; genCode=null; render(); showModal('modal-event'); }
+
+  function renderStepper() {
+    document.getElementById('em-stepper').innerHTML = [1,2,3].map((n,i)=>`
+      <div class="step-node ${n<step?'done':n===step?'active':'pending'}">${n<step?'✓':n}</div>
+      ${i<2?`<div class="step-line flex-fill ${n<step?'done':''}"></div>`:''}
+    `).join('');
+  }
+
+  function render() {
+    document.getElementById('ev-modal-title').textContent = step===3?'🎉 Evento criado!':'Novo evento';
+    renderStepper();
+    const body = document.getElementById('em-body');
+
+    if (step===1) {
+      const opts = Object.entries(typeEmojis).map(([k,v])=>`<option value="${k}" ${data.type===k?'selected':''}>${v} ${k}</option>`).join('');
+      body.innerHTML = `
+        <div class="mb-3"><label class="form-label">Nome do evento *</label>
+          <input id="em-name" class="form-control" placeholder="Ex: Churrasco do fim de semana" value="${data.name||''}" maxlength="60"></div>
+        <div class="mb-3"><label class="form-label">Descrição</label>
+          <textarea id="em-desc" class="form-control" rows="2" placeholder="Detalhes opcionais..." maxlength="200">${data.desc||''}</textarea></div>
+        <div class="mb-3"><label class="form-label">Tipo</label>
+          <select id="em-type" class="form-select">${opts}</select></div>
+        <div class="mb-3"><label class="form-label">Data</label>
+          <input id="em-date" class="form-control" type="date" value="${data.date||new Date().toISOString().slice(0,10)}"></div>
+        <button class="btn btn-teal w-100 py-2 fw-600" onclick="EventModal.next1()">Próximo <i class="bi bi-arrow-right"></i></button>`;
+    }
+
+    else if (step===2) {
+      const me = App.user;
+      body.innerHTML = `
+        <div class="d-flex align-items-center gap-2 mb-3 p-2" style="background:var(--card-alt);border-radius:10px">
+          ${avatarHTML(me.name,me.photo,36)}
+          <div class="flex-fill"><div class="fw-600 small">${me.name}</div><div style="font-size:.7rem;color:var(--muted)">Anfitrião</div></div>
+          <span class="badge badge-teal">Host</span>
+        </div>
+        <label class="form-label">Adicionar participante</label>
+        <div class="d-flex gap-2 mb-2">
+          <input id="em-pname" class="form-control" placeholder="Nome do participante">
+          <button class="btn btn-outline-teal btn-sm flex-shrink-0" onclick="EventModal.addPart()">+</button>
+        </div>
+        <div id="em-parts" class="d-flex flex-wrap gap-2 mb-3">${extraParts.map((n,i)=>`
+          <span class="badge badge-gray p-2">${n} <span style="cursor:pointer" onclick="EventModal.removePart(${i})">✕</span></span>`).join('')}
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-ghost flex-1" onclick="EventModal.setStep(1)"><i class="bi bi-arrow-left"></i></button>
+          <button class="btn btn-teal flex-fill" onclick="EventModal.next2()">Próximo <i class="bi bi-arrow-right"></i></button>
+        </div>`;
+
+      document.getElementById('em-pname').onkeydown = e => { if (e.key==='Enter') EventModal.addPart(); };
+    }
+
+    else if (step===3) {
+      if (!genCode) genCode = App._genCode();
+      const waText = encodeURIComponent(`Olá! Criei o evento *${data.name}* no Me Paga Aí.\nUse o código *${genCode}* para participar! 🤝`);
+      body.innerHTML = `
+        <div class="mpa-card mb-3" style="background:var(--card-alt)">
+          <div class="small text-muted mb-1">RESUMO</div>
+          <div class="fw-700">${data.emoji||'📦'} ${data.name}</div>
+          <div class="small text-muted">${data.type} · ${fmtDateLong(data.date)}</div>
+          <div class="small mt-1">${1+extraParts.length} participante(s)</div>
+        </div>
+        <div style="background:var(--card-alt);border:2px solid var(--teal);border-radius:14px;padding:20px;text-align:center;margin-bottom:16px">
+          <div class="small text-muted mb-1">CÓDIGO DO EVENTO</div>
+          <div style="font-size:2rem;font-weight:800;letter-spacing:6px;color:var(--teal)">${genCode}</div>
+          <div class="small text-muted mt-1">Compartilhe para convidar participantes</div>
+          <div class="d-flex gap-2 justify-content-center mt-2 flex-wrap">
+            <button class="btn btn-ghost btn-sm" onclick="copyText('${genCode}','Código copiado!')"><i class="bi bi-clipboard me-1"></i>Copiar</button>
+            <a class="btn btn-ghost btn-sm" href="https://wa.me/?text=${waText}" target="_blank"><i class="bi bi-whatsapp me-1" style="color:#25d366"></i>WhatsApp</a>
+          </div>
+        </div>
+        <button class="btn btn-teal w-100 py-2 fw-600" onclick="EventModal.confirm()"><i class="bi bi-check-circle me-2"></i>Criar evento</button>`;
+    }
+  }
+
+  function next1() {
+    const name = document.getElementById('em-name').value.trim();
+    if (!name) { toast('Informe o nome do evento','error'); return; }
+    data.name = name;
+    data.desc = document.getElementById('em-desc').value.trim();
+    data.type = document.getElementById('em-type').value;
+    data.date = document.getElementById('em-date').value;
+    data.emoji= typeEmojis[data.type]||'📦';
+    setStep(2);
+  }
+
+  function next2() { setStep(3); }
+
+  async function confirm() {
+    const btn = document.querySelector('#modal-event .btn-teal');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Criando...';
+    btn.disabled = true;
+
+    const ev = await App.createEvent({
+      ...data,
+      extraParticipants: extraParts.map((n,i)=>({ id:'p-'+i+'-'+Date.now(), name:n, isHost:false, pix:null }))
+    });
+    // Override the generated code with our displayed one
+    ev.code = genCode;
+    await Database.saveEvent(ev);
+
+    hideModal('modal-event');
+    toast(`Evento criado! Código: ${genCode} 🎉`);
+    App.currentEvent = ev;
+    EventDetail.render(ev);
+    UI.go('evento');
+  }
+
+  function addPart() {
+    const inp = document.getElementById('em-pname');
+    const v   = inp.value.trim();
+    if (!v || extraParts.includes(v)) return;
+    extraParts.push(v); inp.value=''; render();
+  }
+
+  function removePart(i) { extraParts.splice(i,1); render(); }
+  function setStep(s) { step=s; render(); }
+
+  return { open, next1, next2, confirm, addPart, removePart, setStep };
+})();
+
+// ── EXPENSE MODAL ──────────────────────────────────────────────────────────
+const ExpenseModal = (() => {
+  let photoB64 = null;
+
+  function open() {
+    const ev = App.currentEvent; if (!ev) return;
+    photoB64 = null;
+    const uid   = App.user?.id;
+    const parts = ev.participants;
+
+    document.getElementById('exp-modal-body').innerHTML = `
+      <div class="mb-3"><label class="form-label">Descrição *</label>
+        <input id="ex-desc" class="form-control" placeholder="Ex: Pizza, gasolina, hotel..."></div>
+      <div class="mb-3"><label class="form-label">Valor total (R$) *</label>
+        <input id="ex-amt" class="form-control" type="number" step="0.01" min="0.01" placeholder="0,00"></div>
+      <div class="row g-2 mb-3">
+        <div class="col-6"><label class="form-label">Categoria</label>
+          <select id="ex-cat" class="form-select">
+            ${['Alimentação','Transporte','Hospedagem','Ingresso','Lazer','Saúde','Outro'].map(c=>`<option>${c}</option>`).join('')}
+          </select></div>
+        <div class="col-6"><label class="form-label">Pago por</label>
+          <select id="ex-paid" class="form-select">
+            ${parts.map(p=>`<option value="${p.id}" ${p.id===uid?'selected':''}>${p.name}</option>`).join('')}
+          </select></div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Foto / Comprovante</label>
+        <div class="upload-zone" id="ex-upload" onclick="document.getElementById('ex-photo').click()">
+          <i class="bi bi-camera fs-4 d-block mb-1"></i>Toque para adicionar foto
+          <input type="file" id="ex-photo" accept="image/*" style="display:none">
+        </div>
+      </div>
+
+      <div class="mb-3 d-flex align-items-center justify-content-between">
+        <label class="form-label mb-0">Dividir igualmente</label>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="ex-equal" checked role="switch" style="width:2.5em;height:1.3em">
+        </div>
+      </div>
+
+      <div id="ex-equal-info" class="mpa-card mb-3 text-center">
+        <div class="small text-muted">Cada um paga</div>
+        <div class="fw-700" style="color:var(--teal)" id="ex-per">-</div>
+        <div class="small text-muted">${parts.length} participantes</div>
+      </div>
+      <div id="ex-custom" class="d-none mb-3">
+        <div id="ex-splits"></div>
+        <div class="d-flex justify-content-between small mt-1">
+          <span>Soma:</span><span id="ex-split-sum" class="fw-700">R$ 0,00</span>
+        </div>
+        <div id="ex-split-warn" class="small text-danger d-none mt-1">⚠️ A soma não bate com o total</div>
+      </div>
+
+      <button class="btn btn-teal w-100 py-2 fw-600" onclick="ExpenseModal.save()">
+        <i class="bi bi-plus-circle me-2"></i>Salvar despesa
+      </button>`;
+
+    showModal('modal-expense');
+
+    // photo
+    document.getElementById('ex-photo').onchange = function() {
+      const file = this.files[0]; if (!file) return;
+      const r = new FileReader();
+      r.onload = e => {
+        photoB64 = e.target.result;
+        const zone = document.getElementById('ex-upload');
+        zone.innerHTML = `<img src="${photoB64}" style="width:100%;border-radius:8px;max-height:130px;object-fit:cover">`;
+        zone.classList.add('has-img');
+      };
+      r.readAsDataURL(file);
+    };
+
+    // amount change
+    document.getElementById('ex-amt').oninput = recalc;
+    document.getElementById('ex-equal').onchange = function() {
+      document.getElementById('ex-equal-info').classList.toggle('d-none', !this.checked);
+      document.getElementById('ex-custom').classList.toggle('d-none', this.checked);
+      if (!this.checked) renderSplits();
+      recalc();
+    };
+
+    function recalc() {
+      const amt = parseFloat(document.getElementById('ex-amt').value)||0;
+      document.getElementById('ex-per').textContent = fmt(amt/parts.length);
+      if (!document.getElementById('ex-equal').checked) recalcSplits();
+    }
+
+    function renderSplits() {
+      const amt = parseFloat(document.getElementById('ex-amt').value)||0;
+      const share = amt/parts.length;
+      document.getElementById('ex-splits').innerHTML = parts.map(p=>`
+        <div class="d-flex align-items-center gap-2 py-1">
+          ${avatarHTML(p.name,null,28)}
+          <div class="flex-fill small fw-600">${p.name}</div>
+          <input class="form-control form-control-sm text-end" type="number" step="0.01" data-id="${p.id}"
+            value="${share.toFixed(2)}" style="width:90px" oninput="ExpenseModal.recalcSplits()">
+        </div>`).join('');
+    }
+
+    function recalcSplits() {
+      const amt = parseFloat(document.getElementById('ex-amt').value)||0;
+      const sum = [...document.querySelectorAll('#ex-splits input')].reduce((a,x)=>a+(parseFloat(x.value)||0),0);
+      document.getElementById('ex-split-sum').textContent = fmt(sum);
+      document.getElementById('ex-split-warn').classList.toggle('d-none', Math.abs(sum-amt)<.02);
+    }
+
+    // expose for inline calls
+    ExpenseModal._recalcSplits = recalcSplits;
+  }
+
+  async function save() {
+    const ev = App.currentEvent;
+    const desc = document.getElementById('ex-desc').value.trim();
+    const amt  = parseFloat(document.getElementById('ex-amt').value);
+    if (!desc) { toast('Informe a descrição','error'); return; }
+    if (!amt||amt<=0) { toast('Informe um valor válido','error'); return; }
+
+    const isEqual = document.getElementById('ex-equal').checked;
+    let splits = {};
+    if (!isEqual) {
+      document.querySelectorAll('#ex-splits input').forEach(inp=>{ splits[inp.dataset.id]=parseFloat(inp.value)||0; });
+      const sum = Object.values(splits).reduce((a,b)=>a+b,0);
+      if (Math.abs(sum-amt)>.02) { toast('A soma das cotas não bate com o total','error'); return; }
+    }
+
+    const btn = document.querySelector('#modal-expense .btn-teal');
+    btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+    btn.disabled=true;
+
+    await App.addExpense(ev.code, {
+      desc, amount:amt,
+      cat:  document.getElementById('ex-cat').value,
+      paidBy: document.getElementById('ex-paid').value,
+      splitEqually:isEqual, splits, photo:photoB64
+    });
+
+    hideModal('modal-expense');
+    toast('Despesa adicionada! 💰');
+
+    // nudge
+    const myCota = isEqual ? amt/ev.participants.length : (splits[App.user?.id]||0);
+    if (myCota > 0) {
+      const { pct, days } = nudgeCalc(myCota);
+      const nb = document.getElementById('ev-nudge-wrap');
+      nb.innerHTML = `<div class="nudge-bar mb-2">
+        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+        <div class="flex-fill">Sua cota <strong>${fmt(myCota)}</strong> representa <strong>${pct}%</strong> da poupança estimada e atrasaria uma meta de R$ 10.000 em <strong>${days} dia(s)</strong>.</div>
+        <button onclick="this.parentElement.parentElement.innerHTML=''" style="background:none;border:none;color:var(--amber)">✕</button>
+      </div>`;
+      setTimeout(()=>{ if(nb) nb.innerHTML=''; }, 12000);
+    }
+
+    EventDetail.renderExpenses();
+    EventDetail.renderSaldos();
+  }
+
+  return { open, save, recalcSplits: ()=>ExpenseModal._recalcSplits?.() };
+})();
+
+// ── PIX MODAL ──────────────────────────────────────────────────────────────
+function openPixModal(toName, pixKey, amount) {
+  const qrData = pixKey ? `PIX+${pixKey}+${parseFloat(amount).toFixed(2)}` : `Pagar+${fmt(amount)}+para+${toName}`;
+  document.getElementById('pix-modal-body').innerHTML = `
+    <div class="text-center mb-3">
+      <div class="small text-muted">Pagar para</div>
+      <div class="fw-700 fs-5">${toName}</div>
+      <div class="fw-800" style="font-size:1.8rem;color:var(--teal)">${fmt(parseFloat(amount))}</div>
+    </div>
+    ${pixKey?`<div class="pix-key-row mb-3">
+      <div><div class="small text-muted">Chave PIX</div><div class="fw-600">${pixKey}</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="copyText('${pixKey}','Chave copiada!')"><i class="bi bi-clipboard"></i></button>
+    </div>`:'<div class="text-muted small text-center mb-3">Participante sem chave PIX cadastrada</div>'}
+    <div class="text-center bg-white rounded-3 p-3 mb-3">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}"
+        alt="QR Code" style="width:200px;height:200px;border-radius:8px">
+      <div class="small text-muted mt-2">QR Code simulado</div>
+    </div>
+    <button class="btn btn-teal w-100" data-bs-dismiss="modal">Fechar</button>`;
+  showModal('modal-pix');
+}
+
+// ── PERFIL ─────────────────────────────────────────────────────────────────
+const Perfil = {
+  render() {
+    const u = App.user; if (!u) return;
+    document.getElementById('perf-av').innerHTML = avatarHTML(u.name, u.photo, 80);
+    document.getElementById('perf-name').textContent  = u.name;
+    document.getElementById('perf-email').textContent = u.email;
+
+    document.getElementById('perf-pix').innerHTML = u.pixKeys?.length
+      ? u.pixKeys.map(k=>`<div class="pix-key-row mb-2">
+          <div><div style="font-size:.7rem;color:var(--muted)">${k.type.toUpperCase()}</div><div class="fw-600 small">${k.value}</div></div>
+          <button class="btn btn-ghost btn-sm" onclick="copyText('${k.value}','Chave copiada!')"><i class="bi bi-clipboard"></i></button>
+        </div>`).join('')
+      : '<div class="small text-muted">Nenhuma chave cadastrada</div>';
+
+    const host  = App.events.filter(e=>e.hostId===u.id).length;
+    const guest = App.events.filter(e=>e.hostId!==u.id&&e.participants?.some(p=>p.id===u.id)).length;
+    document.getElementById('perf-stats').innerHTML = [
+      { label:'Anfitrião', val:host,   color:'var(--teal)' },
+      { label:'Convidado', val:guest,  color:'var(--blue)' },
+      { label:'Total',     val:host+guest, color:'#e2e8f0' }
+    ].map(s=>`<div class="col-4"><div class="mpa-card text-center">
+      <div class="fw-800" style="font-size:1.3rem;color:${s.color}">${s.val}</div>
+      <div class="small text-muted">${s.label}</div>
+    </div></div>`).join('');
+  }
+};
+
+// ── BOOT ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await App.init();
+
+  // Realtime event update
+  document.addEventListener('eventUpdated', e => {
+    if (UI.current === 'evento') EventDetail.render(e.detail);
+    if (UI.current === 'home')   Home.render();
+    if (UI.current === 'eventos') EventList.render();
+  });
+
+  // Fix join code input casing
+  document.getElementById('join-code-inp').addEventListener('input', function() {
+    const v = this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'');
+    this.value = v;
+  });
+
+  if (App.user) {
+    UI.go('home');
+  } else {
+    UI.go('landing');
+    document.getElementById('bottom-nav').classList.remove('show');
+  }
+});
 </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
