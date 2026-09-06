@@ -134,13 +134,16 @@ const App = {
 
     ev.expenses.forEach(exp => {
       paid[exp.paidBy] = (paid[exp.paidBy] || 0) + exp.amount;
-      if (exp.splitEqually) {
-        const share = exp.amount / ids.length;
-        ids.forEach(id => { owes[id] = (owes[id] || 0) + share; });
-      } else {
-        Object.entries(exp.splits || {}).forEach(([id, amt]) => {
+      // splits map always holds the per-person amounts
+      // (populated for both equal-all and checkbox-selection modes)
+      if (exp.splits && Object.keys(exp.splits).length > 0) {
+        Object.entries(exp.splits).forEach(([id, amt]) => {
           owes[id] = (owes[id] || 0) + parseFloat(amt || 0);
         });
+      } else if (exp.splitEqually) {
+        // legacy fallback: no splits map, divide equally among all
+        const share = exp.amount / ids.length;
+        ids.forEach(id => { owes[id] = (owes[id] || 0) + share; });
       }
     });
 

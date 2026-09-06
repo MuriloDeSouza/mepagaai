@@ -189,13 +189,6 @@
       display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
     }
 
-    /* ── NUDGE BANNER ────────── */
-    .nudge-bar {
-      background: rgba(245,158,11,.12); border: 1px solid var(--amber);
-      border-radius: 12px; padding: 12px 14px; display: flex;
-      gap: 10px; align-items: flex-start; font-size: .82rem; color: var(--amber);
-    }
-
     /* ── LANDING ─────────────── */
     #screen-landing {
       background: radial-gradient(ellipse at top, #1a3a5c 0%, var(--bg) 60%);
@@ -432,9 +425,6 @@
     <div class="prog-bar"><div class="prog-fill" id="ev-prog-fill" style="width:0%"></div></div>
   </div>
 
-  <!-- nudge -->
-  <div class="px-3 pt-2" id="ev-nudge-wrap"></div>
-
   <!-- tabs -->
   <div class="mpa-tabs px-3">
     <button class="mpa-tab active" data-tab="despesas" onclick="EventDetail.switchTab('despesas',this)">
@@ -606,12 +596,29 @@
         <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body small text-muted">
-        Após encerrar, nenhuma nova despesa poderá ser adicionada. Os saldos ficam visíveis até todos pagarem.
+        Após encerrar, nenhuma nova despesa poderá ser adicionada. Você verá um resumo completo com todos os pagamentos pendentes.
       </div>
       <div class="modal-footer border-0 pt-0">
         <button class="btn btn-ghost" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-danger fw-600" onclick="EventDetail.doClose()">Encerrar evento</button>
+        <button class="btn btn-danger fw-600" onclick="EventDetail.doClose()">
+          <i class="bi bi-lock me-1"></i>Encerrar e ver resumo
+        </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- EVENT SUMMARY (após encerrar) -->
+<div class="modal fade" id="modal-ev-summary" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content" style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-700">
+          <i class="bi bi-clipboard-check me-2" style="color:var(--teal)"></i>Resumo final do evento
+        </h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="ev-summary-body"></div>
     </div>
   </div>
 </div>
@@ -835,10 +842,12 @@ const Home = {
     const urgents = App.events.filter(ev => App.myBalance(ev) < -0.005 && ev.status === 'open');
     urgEl.innerHTML = urgents.map(ev => {
       const bal = Math.abs(App.myBalance(ev));
-      return `<div class="nudge-bar mb-2" onclick="EventDetail.render(ev);UI.go('evento')" style="cursor:pointer">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        <div class="flex-fill"><strong>${fmt(bal)}</strong> a pagar em <em>${ev.name}</em></div>
-        <span>→</span>
+      return `<div onclick="openEventDetail('${ev.code}')" style="cursor:pointer;
+        background:rgba(239,68,68,.1);border:1px solid var(--red);border-radius:12px;
+        padding:12px 14px;display:flex;gap:10px;align-items:center;margin-bottom:8px;font-size:.85rem">
+        <i class="bi bi-exclamation-triangle-fill" style="color:var(--red);flex-shrink:0"></i>
+        <div style="flex:1;color:#e2e8f0"><strong>${fmt(bal)}</strong> a pagar em <em>${ev.name}</em></div>
+        <span style="color:var(--red)">→</span>
       </div>`;
     }).join('');
 
@@ -1075,11 +1084,111 @@ const EventDetail = {
   },
 
   confirmClose() { showModal('modal-close-ev'); },
+
   async doClose() {
     const ev = App.currentEvent; if (!ev) return;
     hideModal('modal-close-ev');
     await App.closeEvent(ev.code);
-    toast('Evento encerrado 🔒');
+
+    // Mostrar resumo de encerramento
+    const balances  = App.calcBalances(ev);
+    const transfers = App.calcSettlement(ev);
+    const total     = ev.expenses.reduce((a,e)=>a+e.amount, 0);
+    const pending   = transfers.filter(t => !t.settled);
+
+    const transferRows = pending.length
+      ? pending.map(t => `
+          <div style="display:flex;align-items:center;gap:10px;background:var(--card-alt);
+            border-radius:12px;padding:12px 14px;margin-bottom:8px">
+            ${avatarHTML(t.fromName, null, 36)}
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:.9rem">${t.fromName}</div>
+              <div style="font-size:.78rem;color:var(--muted)">deve pagar para</div>
+              <div style="font-weight:600;font-size:.9rem">${t.toName}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-weight:800;font-size:1.15rem;color:var(--amber)">${fmt(t.amount)}</div>
+              <button class="btn btn-outline-teal btn-sm mt-1"
+                onclick="openPixModal('${t.toName}','${t.toPix||''}',${t.amount})">
+                <i class="bi bi-qr-code me-1"></i>PIX
+              </button>
+            </div>
+          </div>`)
+        .join('')
+      : `<div style="text-align:center;padding:20px;color:var(--teal);font-weight:600">
+           <i class="bi bi-check-circle" style="font-size:2rem;display:block;margin-bottom:8px"></i>
+           Todos os saldos estão zerados!
+         </div>`;
+
+    const balanceRows = balances.map(b => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;
+        border-bottom:1px solid var(--border)">
+        ${avatarHTML(b.name, null, 32)}
+        <div style="flex:1;font-weight:600;font-size:.88rem">${b.name}</div>
+        <div style="font-size:.8rem;color:var(--muted);text-align:right">
+          Pagou: ${fmt(b.totalPaid)}
+        </div>
+        <div style="font-weight:700;min-width:72px;text-align:right;
+          color:${Math.abs(b.net)<.01?'var(--teal)':b.net>0?'var(--teal)':'var(--red)'}">
+          ${Math.abs(b.net)<.01 ? 'Quite ✓' : (b.net>0?'+':'')+fmt(b.net)}
+        </div>
+      </div>`).join('');
+
+    // WhatsApp summary text
+    const waLines = pending.map(t => `• ${t.fromName} → ${t.toName}: ${fmt(t.amount)}`).join('\n');
+    const waText  = encodeURIComponent(
+      `📊 *Resumo do evento: ${ev.name}*\n` +
+      `💰 Total gasto: ${fmt(total)}\n` +
+      `👥 ${ev.participants.length} participantes\n\n` +
+      (pending.length ? `*Transferências pendentes:*\n${waLines}` : '✅ Todos os saldos estão zerados!') +
+      `\n\n_Me Paga Aí_`
+    );
+
+    document.getElementById('ev-summary-body').innerHTML = `
+      <!-- header verde -->
+      <div style="background:rgba(29,158,117,.12);border-radius:12px;padding:16px;text-align:center;margin-bottom:16px">
+        <i class="bi bi-lock-fill" style="font-size:2rem;color:var(--teal);display:block;margin-bottom:6px"></i>
+        <div style="font-weight:800;font-size:1.1rem">${ev.emoji} ${ev.name}</div>
+        <div style="color:var(--muted);font-size:.82rem;margin-top:2px">Evento encerrado</div>
+      </div>
+
+      <!-- stats row -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+        <div style="background:var(--card-alt);border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:.65rem;color:var(--muted);font-weight:700;letter-spacing:.5px">TOTAL</div>
+          <div style="font-weight:800;color:var(--teal);font-size:1rem;margin-top:2px">${fmt(total)}</div>
+        </div>
+        <div style="background:var(--card-alt);border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:.65rem;color:var(--muted);font-weight:700;letter-spacing:.5px">DESPESAS</div>
+          <div style="font-weight:800;font-size:1rem;margin-top:2px">${ev.expenses.length}</div>
+        </div>
+        <div style="background:var(--card-alt);border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:.65rem;color:var(--muted);font-weight:700;letter-spacing:.5px">PESSOAS</div>
+          <div style="font-weight:800;font-size:1rem;margin-top:2px">${ev.participants.length}</div>
+        </div>
+      </div>
+
+      <!-- quem deve pagar quem -->
+      <div style="font-weight:700;margin-bottom:10px;font-size:.95rem">
+        <i class="bi bi-arrow-left-right me-2" style="color:var(--amber)"></i>
+        ${pending.length ? `${pending.length} transferência(s) pendente(s)` : 'Pagamentos'}
+      </div>
+      ${transferRows}
+
+      <!-- saldo individual -->
+      <div style="font-weight:700;margin-bottom:10px;margin-top:16px;font-size:.95rem">
+        <i class="bi bi-person-check me-2" style="color:var(--teal)"></i>Saldo de cada participante
+      </div>
+      <div style="margin-bottom:16px">${balanceRows}</div>
+
+      <!-- ações -->
+      <a class="btn btn-teal w-100 py-2 fw-600 mb-2"
+        href="https://wa.me/?text=${waText}" target="_blank">
+        <i class="bi bi-whatsapp me-2"></i>Enviar resumo pelo WhatsApp
+      </a>
+      <button class="btn btn-ghost w-100" data-bs-dismiss="modal">Fechar</button>`;
+
+    showModal('modal-ev-summary');
     this.render(ev);
   },
   shareCode() {
@@ -1237,19 +1346,27 @@ const ExpenseModal = (() => {
     const parts = ev.participants;
 
     document.getElementById('exp-modal-body').innerHTML = `
-      <div class="mb-3"><label class="form-label">Descrição *</label>
-        <input id="ex-desc" class="form-control" placeholder="Ex: Pizza, gasolina, hotel..."></div>
-      <div class="mb-3"><label class="form-label">Valor total (R$) *</label>
-        <input id="ex-amt" class="form-control" type="number" step="0.01" min="0.01" placeholder="0,00"></div>
+      <div class="mb-3">
+        <label class="form-label">Descrição *</label>
+        <input id="ex-desc" class="form-control" placeholder="Ex: Pizza, gasolina, hotel...">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Valor total (R$) *</label>
+        <input id="ex-amt" class="form-control" type="number" step="0.01" min="0.01" placeholder="0,00">
+      </div>
       <div class="row g-2 mb-3">
-        <div class="col-6"><label class="form-label">Categoria</label>
+        <div class="col-6">
+          <label class="form-label">Categoria</label>
           <select id="ex-cat" class="form-select">
             ${['Alimentação','Transporte','Hospedagem','Ingresso','Lazer','Saúde','Outro'].map(c=>`<option>${c}</option>`).join('')}
-          </select></div>
-        <div class="col-6"><label class="form-label">Pago por</label>
+          </select>
+        </div>
+        <div class="col-6">
+          <label class="form-label">Pago por</label>
           <select id="ex-paid" class="form-select">
             ${parts.map(p=>`<option value="${p.id}" ${p.id===uid?'selected':''}>${p.name}</option>`).join('')}
-          </select></div>
+          </select>
+        </div>
       </div>
 
       <div class="mb-3">
@@ -1260,24 +1377,50 @@ const ExpenseModal = (() => {
         </div>
       </div>
 
+      <!-- DIVISÃO: toggle -->
       <div class="mb-3 d-flex align-items-center justify-content-between">
-        <label class="form-label mb-0">Dividir igualmente</label>
+        <div>
+          <div class="form-label mb-0">Dividir entre todos</div>
+          <div class="small text-muted" id="ex-mode-hint">Todos os participantes</div>
+        </div>
         <div class="form-check form-switch mb-0">
           <input class="form-check-input" type="checkbox" id="ex-equal" checked role="switch" style="width:2.5em;height:1.3em">
         </div>
       </div>
 
+      <!-- Modo: dividir igualmente entre TODOS -->
       <div id="ex-equal-info" class="mpa-card mb-3 text-center">
-        <div class="small text-muted">Cada um paga</div>
-        <div class="fw-700" style="color:var(--teal)" id="ex-per">-</div>
-        <div class="small text-muted">${parts.length} participantes</div>
-      </div>
-      <div id="ex-custom" class="d-none mb-3">
-        <div id="ex-splits"></div>
-        <div class="d-flex justify-content-between small mt-1">
-          <span>Soma:</span><span id="ex-split-sum" class="fw-700">R$ 0,00</span>
+        <div class="small text-muted mb-1">Valor total</div>
+        <div class="fw-800 mb-1" style="font-size:1.4rem" id="ex-total-display">-</div>
+        <div class="d-flex align-items-center justify-content-center gap-2">
+          <span class="small text-muted">÷ ${parts.length} pessoas</span>
+          <span style="color:var(--teal);font-size:1.1rem">=</span>
+          <span class="fw-700" style="color:var(--teal);font-size:1.1rem" id="ex-per">-</span>
+          <span class="small text-muted">cada</span>
         </div>
-        <div id="ex-split-warn" class="small text-danger d-none mt-1">⚠️ A soma não bate com o total</div>
+      </div>
+
+      <!-- Modo: selecionar quem divide -->
+      <div id="ex-custom" class="d-none mb-3">
+        <div class="small text-muted mb-2">Selecione quem vai dividir esta despesa:</div>
+        <div id="ex-check-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        <div class="mt-3 p-3" style="background:var(--card-alt);border-radius:10px">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="small text-muted">Valor total:</span>
+            <span class="fw-700" id="ex-cust-total">-</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mt-1">
+            <span class="small text-muted">Pessoas selecionadas:</span>
+            <span class="fw-600" id="ex-cust-count" style="color:var(--teal)">0</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mt-1">
+            <span class="small fw-600">Cada um paga:</span>
+            <span class="fw-800" style="color:var(--teal);font-size:1.1rem" id="ex-cust-share">-</span>
+          </div>
+        </div>
+        <div id="ex-sel-warn" class="small text-danger d-none mt-2">
+          <i class="bi bi-exclamation-triangle me-1"></i>Selecione pelo menos uma pessoa.
+        </div>
       </div>
 
       <button class="btn btn-teal w-100 py-2 fw-600" onclick="ExpenseModal.save()">
@@ -1286,7 +1429,7 @@ const ExpenseModal = (() => {
 
     showModal('modal-expense');
 
-    // photo
+    // ── foto ──
     document.getElementById('ex-photo').onchange = function() {
       const file = this.files[0]; if (!file) return;
       const r = new FileReader();
@@ -1299,85 +1442,126 @@ const ExpenseModal = (() => {
       r.readAsDataURL(file);
     };
 
-    // amount change
-    document.getElementById('ex-amt').oninput = recalc;
+    // ── toggle modo ──
     document.getElementById('ex-equal').onchange = function() {
-      document.getElementById('ex-equal-info').classList.toggle('d-none', !this.checked);
-      document.getElementById('ex-custom').classList.toggle('d-none', this.checked);
-      if (!this.checked) renderSplits();
-      recalc();
+      const isEqual = this.checked;
+      document.getElementById('ex-equal-info').classList.toggle('d-none', !isEqual);
+      document.getElementById('ex-custom').classList.toggle('d-none', isEqual);
+      document.getElementById('ex-mode-hint').textContent = isEqual
+        ? 'Todos os participantes'
+        : 'Escolha quem vai dividir';
+      if (!isEqual) renderCheckList();
+      recalcAll();
     };
 
-    function recalc() {
-      const amt = parseFloat(document.getElementById('ex-amt').value)||0;
-      document.getElementById('ex-per').textContent = fmt(amt/parts.length);
-      if (!document.getElementById('ex-equal').checked) recalcSplits();
+    // ── recalcula tudo ao mudar valor ──
+    document.getElementById('ex-amt').oninput = () => {
+      recalcAll();
+      if (!document.getElementById('ex-equal').checked) recalcCustom();
+    };
+
+    function recalcAll() {
+      const amt = parseFloat(document.getElementById('ex-amt').value) || 0;
+      document.getElementById('ex-total-display').textContent = fmt(amt);
+      document.getElementById('ex-per').textContent = fmt(amt / parts.length);
     }
 
-    function renderSplits() {
-      const amt = parseFloat(document.getElementById('ex-amt').value)||0;
-      const share = amt/parts.length;
-      document.getElementById('ex-splits').innerHTML = parts.map(p=>`
-        <div class="d-flex align-items-center gap-2 py-1">
-          ${avatarHTML(p.name,null,28)}
-          <div class="flex-fill small fw-600">${p.name}</div>
-          <input class="form-control form-control-sm text-end" type="number" step="0.01" data-id="${p.id}"
-            value="${share.toFixed(2)}" style="width:90px" oninput="ExpenseModal.recalcSplits()">
-        </div>`).join('');
+    // ── renderiza lista de checkboxes ──
+    function renderCheckList() {
+      document.getElementById('ex-check-list').innerHTML = parts.map(p => `
+        <label style="display:flex;align-items:center;gap:10px;background:var(--card-alt);
+          border-radius:10px;padding:10px 12px;cursor:pointer;border:1.5px solid var(--border);
+          transition:border-color .15s" id="chk-wrap-${p.id}">
+          <input type="checkbox" class="form-check-input ex-chk" data-id="${p.id}"
+            checked style="width:1.2em;height:1.2em;cursor:pointer"
+            onchange="ExpenseModal.recalcCustom()">
+          ${avatarHTML(p.name, null, 30)}
+          <span class="fw-600 flex-fill">${p.name}</span>
+          <span class="fw-700 ex-chk-share" style="color:var(--teal)" id="cshare-${p.id}">-</span>
+        </label>`).join('');
+      recalcCustom();
     }
 
-    function recalcSplits() {
-      const amt = parseFloat(document.getElementById('ex-amt').value)||0;
-      const sum = [...document.querySelectorAll('#ex-splits input')].reduce((a,x)=>a+(parseFloat(x.value)||0),0);
-      document.getElementById('ex-split-sum').textContent = fmt(sum);
-      document.getElementById('ex-split-warn').classList.toggle('d-none', Math.abs(sum-amt)<.02);
+    // expõe para chamada inline
+    ExpenseModal._recalcCustom = recalcCustom;
+
+    function recalcCustom() {
+      const amt      = parseFloat(document.getElementById('ex-amt').value) || 0;
+      const checked  = [...document.querySelectorAll('.ex-chk:checked')];
+      const n        = checked.length;
+      const share    = n > 0 ? amt / n : 0;
+
+      document.getElementById('ex-cust-total').textContent = fmt(amt);
+      document.getElementById('ex-cust-count').textContent = n;
+      document.getElementById('ex-cust-share').textContent = n > 0 ? fmt(share) : '-';
+      document.getElementById('ex-sel-warn').classList.toggle('d-none', n > 0);
+
+      // atualiza valor em cada linha e destaca selecionados
+      parts.forEach(p => {
+        const chk  = document.querySelector(`.ex-chk[data-id="${p.id}"]`);
+        const wrap = document.getElementById(`chk-wrap-${p.id}`);
+        const lbl  = document.getElementById(`cshare-${p.id}`);
+        if (!chk || !wrap || !lbl) return;
+        const sel = chk.checked;
+        wrap.style.borderColor = sel ? 'var(--teal)' : 'var(--border)';
+        wrap.style.background  = sel ? 'rgba(29,158,117,.08)' : 'var(--card-alt)';
+        lbl.textContent = sel ? fmt(share) : '-';
+        lbl.style.color = sel ? 'var(--teal)' : 'var(--muted)';
+      });
     }
 
-    // expose for inline calls
-    ExpenseModal._recalcSplits = recalcSplits;
+    // inicializa display
+    recalcAll();
+  }
+
+  // exposto para chamadas via onchange inline
+  function recalcCustom() {
+    ExpenseModal._recalcCustom && ExpenseModal._recalcCustom();
   }
 
   async function save() {
-    const ev = App.currentEvent;
+    const ev  = App.currentEvent;
     const desc = document.getElementById('ex-desc').value.trim();
     const amt  = parseFloat(document.getElementById('ex-amt').value);
-    if (!desc) { toast('Informe a descrição','error'); return; }
-    if (!amt||amt<=0) { toast('Informe um valor válido','error'); return; }
+    if (!desc) { toast('Informe a descrição', 'error'); return; }
+    if (!amt || amt <= 0) { toast('Informe um valor válido', 'error'); return; }
 
     const isEqual = document.getElementById('ex-equal').checked;
     let splits = {};
-    if (!isEqual) {
-      document.querySelectorAll('#ex-splits input').forEach(inp=>{ splits[inp.dataset.id]=parseFloat(inp.value)||0; });
-      const sum = Object.values(splits).reduce((a,b)=>a+b,0);
-      if (Math.abs(sum-amt)>.02) { toast('A soma das cotas não bate com o total','error'); return; }
+    let splitEquallyAmong = null; // ids dos participantes que dividem
+
+    if (isEqual) {
+      // divide entre todos
+      const share = amt / ev.participants.length;
+      ev.participants.forEach(p => { splits[p.id] = Math.round(share * 100) / 100; });
+    } else {
+      // divide entre os selecionados via checkbox
+      const checked = [...document.querySelectorAll('.ex-chk:checked')];
+      if (checked.length === 0) { toast('Selecione pelo menos uma pessoa', 'error'); return; }
+      const share = amt / checked.length;
+      checked.forEach(chk => {
+        splits[chk.dataset.id] = Math.round(share * 100) / 100;
+      });
+      splitEquallyAmong = checked.map(c => c.dataset.id);
     }
 
     const btn = document.querySelector('#modal-expense .btn-teal');
-    btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
-    btn.disabled=true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+    btn.disabled  = true;
 
     await App.addExpense(ev.code, {
-      desc, amount:amt,
-      cat:  document.getElementById('ex-cat').value,
+      desc, amount: amt,
+      cat:    document.getElementById('ex-cat').value,
       paidBy: document.getElementById('ex-paid').value,
-      splitEqually:isEqual, splits, photo:photoB64
+      splitEqually: isEqual,
+      splitAmong: splitEquallyAmong, // null = todos
+      splits,
+      photo: photoB64
     });
 
     hideModal('modal-expense');
     toast('Despesa adicionada! 💰');
-
-    // nudge
-    const myCota = isEqual ? amt/ev.participants.length : (splits[App.user?.id]||0);
-    if (myCota > 0) {
-      const { pct, days } = nudgeCalc(myCota);
-      const nb = document.getElementById('ev-nudge-wrap');
-      nb.innerHTML = `<div class="nudge-bar mb-2">
-        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
-        <div class="flex-fill">Sua cota <strong>${fmt(myCota)}</strong> representa <strong>${pct}%</strong> da poupança estimada e atrasaria uma meta de R$ 10.000 em <strong>${days} dia(s)</strong>.</div>
-        <button onclick="this.parentElement.parentElement.innerHTML=''" style="background:none;border:none;color:var(--amber)">✕</button>
-      </div>`;
-      setTimeout(()=>{ if(nb) nb.innerHTML=''; }, 12000);
-    }
+    // sem nudge do Finspace — app standalone
 
     EventDetail.renderExpenses();
     EventDetail.renderSaldos();
