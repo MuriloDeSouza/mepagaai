@@ -13,11 +13,16 @@ const App = {
     this.user = Database.loadUser();
     if (this.user) {
       this.events = Database.getUserEvents(this.user.id);
+
       // Injeta demo event se Supabase não estiver configurado
       if (!SB_ONLINE) {
         const demo = Database.getDemoEvents()[0];
         if (!this.events.find(e => e.code === demo.code)) this.events.unshift(demo);
       }
+
+      // ⚡ CRÍTICO: reativar watcher para TODOS os eventos do usuário ao recarregar a página.
+      // Sem isso, mudanças feitas por outros usuários nunca chegam depois de um F5.
+      this.events.forEach(ev => this._watchEvent(ev.code));
     }
   },
 
@@ -225,15 +230,32 @@ const App = {
 
   // ── Realtime watcher ─────────────────────────────────────────────────────
   _watchEvent(code) {
+    // Evita duplicar o canal — mas se o Supabase não estava pronto antes, tenta de novo
     if (this._watchers[code]) return;
-    const unsub = Database.watchEvent(code, (ev) => {
+
+    const unsub = Database.watchEvent(code, (updatedEv) => {
+      // 1. Atualiza sempre o cache em memória
       const idx = this.events.findIndex(e => e.code === code);
-      if (idx >= 0) this.events[idx] = ev; else this.events.unshift(ev);
-      if (this.currentEvent?.code === code) {
-        this.currentEvent = ev;
-        document.dispatchEvent(new CustomEvent('eventUpdated', { detail: ev }));
+      if (idx >= 0) {
+        this.events[idx] = updatedEv;
+      } else {
+        this.events.unshift(updatedEv);
       }
+
+      // 2. Atualiza localStorage como cache local
+      Database.saveEventLocal(updatedEv);
+
+      // 3. Se o evento aberto é este, atualiza currentEvent
+      if (this.currentEvent?.code === code) {
+        this.currentEvent = updatedEv;
+      }
+
+      // 4. Dispara evento para a UI reagir — independente de qual tela está aberta
+      document.dispatchEvent(new CustomEvent('eventUpdated', {
+        detail: { ev: updatedEv, code }
+      }));
     });
+
     this._watchers[code] = unsub;
   },
 
