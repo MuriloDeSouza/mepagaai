@@ -1,136 +1,164 @@
 /**
- * db.js — Camada de persistência
- * Usa Firebase Realtime Database (gratuito) + localStorage como cache local.
- * Eventos ficam em /events/{code} — qualquer pessoa com o código acessa.
- * Usuários ficam em localStorage (sem login real, identificados por UUID).
+ * db.js — Camada de persistência — Supabase Edition
+ *
+ * Estratégia:
+ *  1. Supabase (PostgreSQL) é o banco principal — eventos ficam na tabela `events`
+ *  2. localStorage serve de cache offline e fallback imediato
+ *  3. Usuários ficam só no localStorage (sem auth real — identificados por UUID gerado no cadastro)
+ *
+ * Tabela necessária no Supabase (ver README para SQL de criação):
+ *   events (code TEXT PRIMARY KEY, data JSONB, updated_at TIMESTAMPTZ)
+ *
+ * ⚠️  MURILO: preencha SUPABASE_URL e SUPABASE_ANON_KEY abaixo com os seus dados.
  */
 
-// ── FIREBASE CONFIG ────────────────────────────────────────────────────────
-// ⚠️  MURILO: substitua pelos seus dados do Firebase Console
-//    (Instruções no README — é gratuito e leva 3 minutos)
-const FIREBASE_CONFIG = {
-  apiKey:            "AIzaSyDEMO_SUBSTITUA_PELA_SUA_KEY",
-  authDomain:        "mepagaai-demo.firebaseapp.com",
-  databaseURL:       "https://mepagaai-demo-default-rtdb.firebaseio.com",
-  projectId:         "mepagaai-demo",
-  storageBucket:     "mepagaai-demo.appspot.com",
-  messagingSenderId: "000000000000",
-  appId:             "1:000000000000:web:demo0000000000000000"
-};
+// ── SUPABASE CONFIG ────────────────────────────────────────────────────────
+const SUPABASE_URL      = 'https://iomwujpefmekznrkoxum.supabase.co';      // ← substitua
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvbXd1anBlZm1la3pucmtveHVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwODYwNDUsImV4cCI6MjEwNDY2MjA0NX0.0JQ9cUSGNPtNbS3dd3U4jQiovB1PB0F7yATMAXMpTJM'; // ← substitua
 
-// ── FIREBASE INIT ──────────────────────────────────────────────────────────
-let DB = null;          // Firebase DB reference
-let FB_ONLINE = false;  // whether Firebase is reachable
+// ── SUPABASE CLIENT ────────────────────────────────────────────────────────
+let SB = null;        // cliente Supabase
+let SB_ONLINE = false;
 
-function initFirebase() {
+function initSupabase() {
   try {
-    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-    DB = firebase.database();
-    FB_ONLINE = true;
-    console.log('[DB] Firebase connected');
-  } catch(e) {
-    console.warn('[DB] Firebase unavailable, running offline:', e.message);
-    FB_ONLINE = false;
+    // O SDK do Supabase é carregado via CDN no index.html
+    SB = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    SB_ONLINE = true;
+    console.log('[DB] Supabase conectado');
+  } catch (e) {
+    console.warn('[DB] Supabase indisponível, rodando offline:', e.message);
+    SB_ONLINE = false;
   }
 }
 
 // ── LOCAL STORAGE HELPERS ──────────────────────────────────────────────────
 const LS = {
   get(key)        { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } },
-  set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) { console.warn('[LS] write failed:', e); } },
+  set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) { console.warn('[LS]', e); } },
   del(key)        { localStorage.removeItem(key); },
 };
 
 // ── DATABASE API ───────────────────────────────────────────────────────────
 const Database = {
 
-  // ── USERS (local only — no sensitive data, just nickname + UUID) ──────────
-  saveUser(user) {
-    LS.set('mpa_user', user);
-  },
+  // ── USUÁRIOS (apenas localStorage) ────────────────────────────────────────
+  saveUser(user)  { LS.set('mpa_user', user); },
+  loadUser()      { return LS.get('mpa_user'); },
+  clearUser()     { LS.del('mpa_user'); },
 
-  loadUser() {
-    return LS.get('mpa_user');
-  },
+  // ── EVENTOS ────────────────────────────────────────────────────────────────
 
-  clearUser() {
-    LS.del('mpa_user');
-  },
-
-  // ── EVENTS ────────────────────────────────────────────────────────────────
-
-  /** Salva evento no Firebase (chave = code) e no localStorage */
+  /** Grava evento no Supabase (upsert pelo code) e no localStorage */
   async saveEvent(event) {
+    // 1. Cache local imediato — nunca falha
     LS.set('mpa_ev_' + event.code, event);
-    if (FB_ONLINE && DB) {
+
+    // 2. Supabase — upsert na tabela events
+    if (SB_ONLINE && SB) {
       try {
-        await DB.ref('events/' + event.code).set(event);
-      } catch(e) {
-        console.warn('[DB] saveEvent offline:', e.message);
+        const { error } = await SB
+          .from('events')
+          .upsert(
+            { code: event.code, data: event, updated_at: new Date().toISOString() },
+            { onConflict: 'code' }
+          );
+        if (error) console.warn('[DB] saveEvent Supabase error:', error.message);
+      } catch (e) {
+        console.warn('[DB] saveEvent falhou:', e.message);
       }
     }
   },
 
-  /** Busca evento pelo código: tenta Firebase, cai no localStorage */
+  /** Apenas localStorage — usado como write-ahead antes do sync remoto */
+  saveEventLocal(event) {
+    LS.set('mpa_ev_' + event.code, event);
+  },
+
+  /** Busca evento pelo código: tenta Supabase, cai no localStorage */
   async getEventByCode(code) {
     code = code.toUpperCase().trim();
-    // 1. Tenta Firebase
-    if (FB_ONLINE && DB) {
+
+    // 1. Tenta Supabase
+    if (SB_ONLINE && SB) {
       try {
-        const snap = await DB.ref('events/' + code).once('value');
-        if (snap.exists()) {
-          const ev = snap.val();
-          LS.set('mpa_ev_' + code, ev); // atualiza cache
+        const { data, error } = await SB
+          .from('events')
+          .select('data')
+          .eq('code', code)
+          .maybeSingle();
+
+        if (!error && data) {
+          const ev = data.data;
+          LS.set('mpa_ev_' + code, ev);  // atualiza cache local
           return ev;
         }
-      } catch(e) {
-        console.warn('[DB] getEventByCode Firebase error:', e.message);
+      } catch (e) {
+        console.warn('[DB] getEventByCode Supabase error:', e.message);
       }
     }
-    // 2. localStorage fallback
+
+    // 2. Fallback localStorage
     return LS.get('mpa_ev_' + code);
   },
 
-  /** Retorna todos os eventos que o usuário participa (do localStorage) */
+  /** Todos os eventos do usuário (varre localStorage) */
   getUserEvents(userId) {
-    const keys = Object.keys(localStorage).filter(k => k.startsWith('mpa_ev_'));
-    return keys.map(k => LS.get(k)).filter(ev => ev &&
-      ev.participants && ev.participants.some(p => p.id === userId)
-    );
+    return Object.keys(localStorage)
+      .filter(k => k.startsWith('mpa_ev_'))
+      .map(k => LS.get(k))
+      .filter(ev => ev?.participants?.some(p => p.id === userId));
   },
 
-  /** Ouve mudanças em tempo real num evento (Firebase only) */
+  /**
+   * Ouve mudanças em tempo real num evento via Supabase Realtime.
+   * Retorna função de cancelamento (unsubscribe).
+   */
   watchEvent(code, callback) {
-    if (!FB_ONLINE || !DB) return () => {};
-    const ref = DB.ref('events/' + code);
-    ref.on('value', snap => {
-      if (snap.exists()) {
-        const ev = snap.val();
-        LS.set('mpa_ev_' + code, ev);
-        callback(ev);
-      }
-    });
-    return () => ref.off(); // unsubscribe fn
+    if (!SB_ONLINE || !SB) return () => {};
+
+    const channel = SB
+      .channel('event-' + code)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'events', filter: `code=eq.${code}` },
+        payload => {
+          const ev = payload.new?.data;
+          if (ev) {
+            LS.set('mpa_ev_' + code, ev);
+            callback(ev);
+          }
+        }
+      )
+      .subscribe();
+
+    // retorna função de cleanup
+    return () => SB.removeChannel(channel);
   },
 
-  /** Demo events — carregados apenas se Firebase não estiver configurado */
+  /** Evento de demonstração — acessível sem Supabase configurado */
   getDemoEvents() {
     return [
       {
-        id: "evt-001", code: "FIN-DEMO",
-        name: "Churrasco Fim de Semana", emoji: "🍖", type: "Refeição",
-        description: "Evento de demonstração — qualquer um pode entrar!", date: "2025-08-15", status: "open",
-        hostId: "demo-host",
+        id: 'evt-demo', code: 'FIN-DEMO',
+        name: 'Churrasco de Demonstração', emoji: '🍖', type: 'Refeição',
+        description: 'Evento de demo — entre com o código FIN-DEMO para testar!',
+        date: '2025-09-01', status: 'open',
+        hostId: 'demo-host',
         participants: [
-          { id:"demo-host", name:"João (Host)", isHost:true,  pix:"11999998888" },
-          { id:"demo-p2",   name:"Beatriz",     isHost:false, pix:null },
-          { id:"demo-p3",   name:"Carlos",      isHost:false, pix:null },
+          { id: 'demo-host', name: 'João (Host)', isHost: true,  pix: '11999998888' },
+          { id: 'demo-p2',   name: 'Beatriz',     isHost: false, pix: null },
+          { id: 'demo-p3',   name: 'Carlos',      isHost: false, pix: null },
         ],
         expenses: [
-          { id:"demo-exp1", desc:"Carne e carvão", amount:180, cat:"Alimentação", paidBy:"demo-host", splitEqually:true, splits:{}, photo:null, date:"2025-08-15" },
-          { id:"demo-exp2", desc:"Bebidas",        amount:120, cat:"Alimentação", paidBy:"demo-p2",   splitEqually:true, splits:{}, photo:null, date:"2025-08-15" },
+          { id:'demo-e1', desc:'Carne e carvão', amount:180, cat:'Alimentação',
+            paidBy:'demo-host', splitEqually:true,
+            splits:{'demo-host':60,'demo-p2':60,'demo-p3':60}, photo:null, date:'2025-09-01' },
+          { id:'demo-e2', desc:'Bebidas e gelo', amount:120, cat:'Alimentação',
+            paidBy:'demo-p2', splitEqually:true,
+            splits:{'demo-host':40,'demo-p2':40,'demo-p3':40}, photo:null, date:'2025-09-01' },
         ],
-        settled:[]
+        settled: []
       }
     ];
   }

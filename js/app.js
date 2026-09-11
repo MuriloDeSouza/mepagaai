@@ -5,16 +5,16 @@ const App = {
   user: null,
   events: [],          // eventos em memória (cache)
   currentEvent: null,
-  _watchers: {},       // Firebase realtime watchers
+  _watchers: {},       // Supabase Realtime watchers
 
   // ── Inicializar ──────────────────────────────────────────────────────────
   async init() {
-    initFirebase();
+    initSupabase();
     this.user = Database.loadUser();
     if (this.user) {
       this.events = Database.getUserEvents(this.user.id);
-      // Injeta demo event se Firebase não configurado
-      if (!FB_ONLINE) {
+      // Injeta demo event se Supabase não estiver configurado
+      if (!SB_ONLINE) {
         const demo = Database.getDemoEvents()[0];
         if (!this.events.find(e => e.code === demo.code)) this.events.unshift(demo);
       }
@@ -94,21 +94,35 @@ const App = {
 
   async addExpense(eventCode, expData) {
     const ev = this.events.find(e => e.code === eventCode);
-    if (!ev) return;
+    if (!ev) throw new Error('Evento não encontrado: ' + eventCode);
+
     const exp = {
-      id:          'exp-' + Date.now(),
-      desc:        expData.desc,
-      amount:      expData.amount,
-      cat:         expData.cat,
-      paidBy:      expData.paidBy,
-      splitEqually:expData.splitEqually,
-      splits:      expData.splits || {},
-      photo:       expData.photo || null,
-      date:        new Date().toISOString().slice(0,10),
-      addedBy:     this.user.id
+      id:           'exp-' + Date.now(),
+      desc:         expData.desc,
+      amount:       expData.amount,
+      cat:          expData.cat,
+      paidBy:       expData.paidBy,
+      splitEqually: expData.splitEqually,
+      splitAmong:   expData.splitAmong || null,
+      splits:       expData.splits || {},
+      photo:        expData.photo || null,
+      date:         new Date().toISOString().slice(0, 10),
+      addedBy:      this.user.id
     };
+
     ev.expenses.push(exp);
-    await Database.saveEvent(ev);
+
+    // Salvar localmente primeiro — garante que não perde o dado mesmo se Firebase falhar
+    Database.saveEventLocal(ev);
+
+    // Tentar sincronizar com Firebase (não bloqueia se falhar)
+    try {
+      await Database.saveEvent(ev);
+    } catch (e) {
+      console.warn('[App.addExpense] Firebase falhou, salvo só localmente:', e.message);
+      // não relança — dado está local, usuário pode continuar
+    }
+
     return exp;
   },
 
@@ -116,14 +130,16 @@ const App = {
     const ev = this.events.find(e => e.code === eventCode);
     if (!ev) return;
     ev.settled.push({ fromId, toId, ts: Date.now() });
-    await Database.saveEvent(ev);
+    Database.saveEventLocal(ev);
+    try { await Database.saveEvent(ev); } catch(e) { console.warn('[markSettled]', e.message); }
   },
 
   async closeEvent(eventCode) {
     const ev = this.events.find(e => e.code === eventCode);
     if (!ev) return;
     ev.status = 'closed';
-    await Database.saveEvent(ev);
+    Database.saveEventLocal(ev);
+    try { await Database.saveEvent(ev); } catch(e) { console.warn('[closeEvent]', e.message); }
   },
 
   // ── Cálculos ─────────────────────────────────────────────────────────────

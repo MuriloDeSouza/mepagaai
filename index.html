@@ -13,9 +13,8 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <!-- Firebase 9 compat -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
   <style>
     :root {
@@ -1423,7 +1422,7 @@ const ExpenseModal = (() => {
         </div>
       </div>
 
-      <button class="btn btn-teal w-100 py-2 fw-600" onclick="ExpenseModal.save()">
+      <button id="ex-save-btn" class="btn btn-teal w-100 py-2 fw-600" onclick="ExpenseModal.save()">
         <i class="bi bi-plus-circle me-2"></i>Salvar despesa
       </button>`;
 
@@ -1545,29 +1544,43 @@ const ExpenseModal = (() => {
       splitEquallyAmong = checked.map(c => c.dataset.id);
     }
 
-    const btn = document.querySelector('#modal-expense .btn-teal');
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
-    btn.disabled  = true;
+    // usar id fixo no botão para não perder a referência
+    const btn = document.getElementById('ex-save-btn');
+    const resetBtn = () => {
+      if (btn) {
+        btn.innerHTML = '<i class="bi bi-plus-circle me-2"></i>Salvar despesa';
+        btn.disabled  = false;
+      }
+    };
 
-    await App.addExpense(ev.code, {
-      desc, amount: amt,
-      cat:    document.getElementById('ex-cat').value,
-      paidBy: document.getElementById('ex-paid').value,
-      splitEqually: isEqual,
-      splitAmong: splitEquallyAmong, // null = todos
-      splits,
-      photo: photoB64
-    });
+    if (btn) {
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+      btn.disabled  = true;
+    }
 
-    hideModal('modal-expense');
-    toast('Despesa adicionada! 💰');
-    // sem nudge do Finspace — app standalone
+    try {
+      await App.addExpense(ev.code, {
+        desc, amount: amt,
+        cat:    document.getElementById('ex-cat').value,
+        paidBy: document.getElementById('ex-paid').value,
+        splitEqually: isEqual,
+        splitAmong: splitEquallyAmong,
+        splits,
+        photo: photoB64
+      });
 
-    EventDetail.renderExpenses();
-    EventDetail.renderSaldos();
+      hideModal('modal-expense');
+      toast('Despesa adicionada! 💰');
+      EventDetail.renderExpenses();
+      EventDetail.renderSaldos();
+    } catch (err) {
+      console.error('[ExpenseModal.save] erro:', err);
+      toast('Erro ao salvar. Tente novamente.', 'error');
+      resetBtn();
+    }
   }
 
-  return { open, save, recalcSplits: ()=>ExpenseModal._recalcSplits?.() };
+  return { open, save, recalcCustom: ()=>ExpenseModal._recalcCustom?.() };
 })();
 
 // ── PIX MODAL ──────────────────────────────────────────────────────────────
