@@ -3,27 +3,41 @@
 // ── APP STATE ──────────────────────────────────────────────────────────────
 const App = {
   user: null,
-  events: [],          // eventos em memória (cache)
+  events: [],
   currentEvent: null,
-  _watchers: {},       // Supabase Realtime watchers
+  _watchers: {},
 
   // ── Inicializar ──────────────────────────────────────────────────────────
   async init() {
     initSupabase();
     this.user = Database.loadUser();
-    if (this.user) {
-      this.events = Database.getUserEvents(this.user.id);
+    if (!this.user) return;
 
-      // Injeta demo event se Supabase não estiver configurado
-      if (!SB_ONLINE) {
-        const demo = Database.getDemoEvents()[0];
-        if (!this.events.find(e => e.code === demo.code)) this.events.unshift(demo);
-      }
+    // 1. Carrega do localStorage imediatamente (tela não fica em branco)
+    this.events = Database.getUserEvents(this.user.id);
 
-      // ⚡ CRÍTICO: reativar watcher para TODOS os eventos do usuário ao recarregar a página.
-      // Sem isso, mudanças feitas por outros usuários nunca chegam depois de um F5.
-      this.events.forEach(ev => this._watchEvent(ev.code));
+    // 2. Se Supabase está disponível, busca versão atualizada de cada evento
+    //    Isso resolve o problema do HOST que recarregou a página e não via
+    //    o novo participante — o localStorage dele estava desatualizado.
+    if (SB_ONLINE) {
+      const refreshed = await Promise.all(
+        this.events.map(ev => Database.getEventByCode(ev.code).catch(() => ev))
+      );
+      refreshed.forEach(fresh => {
+        if (!fresh) return;
+        const idx = this.events.findIndex(e => e.code === fresh.code);
+        if (idx >= 0) this.events[idx] = fresh;
+        Database.saveEventLocal(fresh); // atualiza cache local também
+      });
+    } else {
+      // offline: injeta demo para testes
+      const demo = Database.getDemoEvents()[0];
+      if (!this.events.find(e => e.code === demo.code)) this.events.unshift(demo);
     }
+
+    // 3. Ativa watcher de tempo real para todos os eventos
+    //    (garante que mudanças futuras chegam sem precisar recarregar)
+    this.events.forEach(ev => this._watchEvent(ev.code));
   },
 
   // ── Usuário ──────────────────────────────────────────────────────────────
@@ -43,7 +57,7 @@ const App = {
   logout() {
     this._stopAllWatchers();
     Database.clearUser();
-    this.user = null;
+    this.user   = null;
     this.events = [];
     this.currentEvent = null;
   },
@@ -67,7 +81,7 @@ const App = {
         ...( data.extraParticipants || [] )
       ],
       expenses: [],
-      settled: [],
+      settled:  [],
       createdAt: new Date().toISOString()
     };
     await Database.saveEvent(ev);
@@ -79,7 +93,7 @@ const App = {
   async joinByCode(code) {
     const ev = await Database.getEventByCode(code);
     if (!ev) return null;
-    // add user if not already in
+
     const already = ev.participants.find(p => p.id === this.user.id);
     if (!already) {
       ev.participants.push({
@@ -90,7 +104,7 @@ const App = {
       });
       await Database.saveEvent(ev);
     }
-    // merge into local list
+
     const idx = this.events.findIndex(e => e.code === ev.code);
     if (idx >= 0) this.events[idx] = ev; else this.events.unshift(ev);
     this._watchEvent(ev.code);
@@ -116,16 +130,12 @@ const App = {
     };
 
     ev.expenses.push(exp);
-
-    // Salvar localmente primeiro — garante que não perde o dado mesmo se Firebase falhar
     Database.saveEventLocal(ev);
 
-    // Tentar sincronizar com Firebase (não bloqueia se falhar)
     try {
       await Database.saveEvent(ev);
     } catch (e) {
       console.warn('[App.addExpense] Firebase falhou, salvo só localmente:', e.message);
-      // não relança — dado está local, usuário pode continuar
     }
 
     return exp;
@@ -155,14 +165,12 @@ const App = {
 
     ev.expenses.forEach(exp => {
       paid[exp.paidBy] = (paid[exp.paidBy] || 0) + exp.amount;
-      // splits map always holds the per-person amounts
-      // (populated for both equal-all and checkbox-selection modes)
+
       if (exp.splits && Object.keys(exp.splits).length > 0) {
         Object.entries(exp.splits).forEach(([id, amt]) => {
           owes[id] = (owes[id] || 0) + parseFloat(amt || 0);
         });
       } else if (exp.splitEqually) {
-        // legacy fallback: no splits map, divide equally among all
         const share = exp.amount / ids.length;
         ids.forEach(id => { owes[id] = (owes[id] || 0) + share; });
       }
@@ -172,7 +180,7 @@ const App = {
       const p = ev.participants.find(x => x.id === id);
       return {
         id, name: p.name, isHost: p.isHost, pix: p.pix,
-        net: Math.round((paid[id] - owes[id]) * 100) / 100,
+        net:       Math.round((paid[id] - owes[id]) * 100) / 100,
         totalPaid: Math.round(paid[id] * 100) / 100
       };
     });
@@ -186,7 +194,7 @@ const App = {
     debtors.sort((a,b) => a.net - b.net);
 
     const transfers = [];
-    let i=0, j=0;
+    let i = 0, j = 0;
     while (i < creditors.length && j < debtors.length) {
       const amt = Math.min(creditors[i].net, Math.abs(debtors[j].net));
       if (amt > 0.005) {
@@ -219,7 +227,7 @@ const App = {
     let toReceive = 0, toPay = 0;
     this.events.forEach(ev => {
       const b = this.myBalance(ev);
-      if (b > 0.005)  toReceive += b;
+      if (b >  0.005) toReceive += b;
       else if (b < -0.005) toPay += Math.abs(b);
     });
     return {
@@ -230,27 +238,23 @@ const App = {
 
   // ── Realtime watcher ─────────────────────────────────────────────────────
   _watchEvent(code) {
-    // Evita duplicar o canal — mas se o Supabase não estava pronto antes, tenta de novo
     if (this._watchers[code]) return;
 
     const unsub = Database.watchEvent(code, (updatedEv) => {
-      // 1. Atualiza sempre o cache em memória
+      // 1. Atualiza cache em memória
       const idx = this.events.findIndex(e => e.code === code);
-      if (idx >= 0) {
-        this.events[idx] = updatedEv;
-      } else {
-        this.events.unshift(updatedEv);
-      }
+      if (idx >= 0) this.events[idx] = updatedEv;
+      else this.events.unshift(updatedEv);
 
-      // 2. Atualiza localStorage como cache local
+      // 2. Atualiza localStorage
       Database.saveEventLocal(updatedEv);
 
-      // 3. Se o evento aberto é este, atualiza currentEvent
+      // 3. Atualiza currentEvent se for este
       if (this.currentEvent?.code === code) {
         this.currentEvent = updatedEv;
       }
 
-      // 4. Dispara evento para a UI reagir — independente de qual tela está aberta
+      // 4. Notifica a UI
       document.dispatchEvent(new CustomEvent('eventUpdated', {
         detail: { ev: updatedEv, code }
       }));
